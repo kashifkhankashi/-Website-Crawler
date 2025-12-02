@@ -5,6 +5,23 @@ let charts = {};
 
 // Load results when page loads
 document.addEventListener('DOMContentLoaded', async function() {
+    // Check authentication first
+    try {
+        const response = await fetch('/api/check-auth');
+        const data = await response.json();
+        
+        if (!data.authenticated) {
+            // Not authenticated, redirect to login
+            window.location.href = '/';
+            return;
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
+        window.location.href = '/';
+        return;
+    }
+    
+    // User is authenticated, proceed with loading results
     await loadResults();
     setupDownloadButtons();
     setupEventListeners();

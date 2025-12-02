@@ -18,7 +18,20 @@ from crawl import CrawlerRunner
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['UPLOAD_FOLDER'] = 'output'
+
+# Detect if running on Vercel (serverless environment)
+IS_VERCEL = os.environ.get('VERCEL', '0') == '1' or os.environ.get('VERCEL_ENV') is not None
+
+# Use /tmp for Vercel (writable), or 'output' for local development
+if IS_VERCEL:
+    OUTPUT_BASE_DIR = '/tmp/output'
+else:
+    OUTPUT_BASE_DIR = 'output'
+
+app.config['UPLOAD_FOLDER'] = OUTPUT_BASE_DIR
+
+# Ensure output directory exists
+os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
 # Configure SocketIO for Vercel (serverless-friendly)
 socketio = SocketIO(
     app, 
@@ -30,6 +43,10 @@ socketio = SocketIO(
 
 # Store active crawls
 active_crawls: Dict[str, dict] = {}
+
+# Hardcoded credentials
+VALID_USERNAME = 'kashi'
+VALID_PASSWORD = 'Blackhat@123'
 
 # Add error handlers to ensure JSON responses (important for Vercel)
 @app.errorhandler(404)
@@ -48,6 +65,58 @@ def handle_exception(e):
     return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 
+def login_required(f):
+    """Decorator to require login for routes."""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Handle user login."""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+        
+        data = request.get_json() or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            session['authenticated'] = True
+            session['username'] = username
+            return jsonify({
+                'success': True,
+                'message': 'Login successful'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid username or password'
+            }), 401
+    except Exception as e:
+        return jsonify({'error': f'Login error: {str(e)}'}), 500
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Handle user logout."""
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+@app.route('/api/check-auth', methods=['GET'])
+def check_auth():
+    """Check if user is authenticated."""
+    if session.get('authenticated'):
+        return jsonify({
+            'authenticated': True,
+            'username': session.get('username')
+        })
+    return jsonify({'authenticated': False}), 401
+
 @app.route('/')
 def index():
     """Main page with crawler form."""
@@ -55,6 +124,7 @@ def index():
 
 
 @app.route('/api/start-crawl', methods=['POST'])
+@login_required
 def start_crawl():
     """Start a new crawl job."""
     try:
@@ -64,7 +134,6 @@ def start_crawl():
         data = request.get_json() or {}
         start_url = data.get('url', '').strip()
         max_depth = int(data.get('max_depth', 10))
-        output_dir = data.get('output_dir', 'output')
         clear_cache = data.get('clear_cache', True)  # Clear cache by default
         
         if not start_url:
@@ -93,8 +162,11 @@ def start_crawl():
     # Generate unique job ID
     job_id = str(uuid.uuid4())
     
+    # Use the configured output base directory
+    base_output_dir = app.config['UPLOAD_FOLDER']
+    
     # Create output directory for this job
-    job_output_dir = os.path.join(output_dir, job_id)
+    job_output_dir = os.path.join(base_output_dir, job_id)
     os.makedirs(job_output_dir, exist_ok=True)
     
     # Store crawl info
@@ -126,7 +198,7 @@ def start_crawl():
     })
 
 
-def run_crawl_async(job_id: str, start_url: str, max_depth: int, output_dir: str):
+def run_crawl_async(job_id: str, start_url: str, max_depth: int, job_output_dir: str):
     """Run crawl in background thread and emit progress updates."""
     try:
         # Update status - Initializing
@@ -160,12 +232,12 @@ def run_crawl_async(job_id: str, start_url: str, max_depth: int, output_dir: str
         from crawl import CrawlerRunner
         
         # Track progress by monitoring output directory
-        progress_file = os.path.join(output_dir, 'progress.json')
+        progress_file = os.path.join(job_output_dir, 'progress.json')
         
         runner = CrawlerRunner(
             start_url=start_url,
             max_depth=max_depth,
-            output_dir=output_dir,
+            output_dir=job_output_dir,  # Use job-specific directory
             use_subprocess=True,
             progress_file=progress_file,
             job_id=job_id
@@ -248,11 +320,13 @@ def run_crawl_async(job_id: str, start_url: str, max_depth: int, output_dir: str
         active_crawls[job_id]['progress'] = 100
         active_crawls[job_id]['completed_at'] = datetime.now().isoformat()
         active_crawls[job_id]['pages_crawled'] = len(runner.crawled_items)
+        # Store output files paths
         active_crawls[job_id]['output_files'] = {
-            'json': os.path.join(output_dir, 'report.json'),
-            'csv': os.path.join(output_dir, 'summary.csv'),
-            'sitemap': os.path.join(output_dir, 'sitemap.txt')
+            'json': os.path.join(job_output_dir, 'report.json'),
+            'csv': os.path.join(job_output_dir, 'summary.csv'),
+            'sitemap': os.path.join(job_output_dir, 'sitemap.txt')
         }
+        active_crawls[job_id]['output_dir'] = job_output_dir  # Store for reference
         
         socketio.emit('progress', {
             'job_id': job_id,
@@ -292,7 +366,8 @@ def get_crawl_status(job_id: str):
         
         if job_id not in active_crawls:
             # Check if results exist (crawl might have completed before)
-            json_path = os.path.join('output', job_id, 'report.json')
+            base_output = app.config['UPLOAD_FOLDER']
+            json_path = os.path.join(base_output, job_id, 'report.json')
             if os.path.exists(json_path):
                 return jsonify({
                     'status': 'completed',
@@ -302,7 +377,7 @@ def get_crawl_status(job_id: str):
                 })
             
             # Also check default output location
-            default_json_path = os.path.join('output', 'report.json')
+            default_json_path = os.path.join(base_output, 'report.json')
             if os.path.exists(default_json_path):
                 return jsonify({
                     'status': 'completed',
@@ -338,6 +413,7 @@ def get_crawl_status(job_id: str):
 
 
 @app.route('/api/crawl-results/<job_id>')
+@login_required
 def get_crawl_results(job_id: str):
     """Get results of a completed crawl."""
     try:
@@ -351,11 +427,12 @@ def get_crawl_results(job_id: str):
             json_path = crawl_info.get('output_files', {}).get('json')
         
         # If not in active_crawls or path not found, try to find the file directly
+        base_output = app.config['UPLOAD_FOLDER']
         if not json_path or not os.path.exists(json_path):
             # Try different possible locations
             possible_paths = [
-                os.path.join('output', job_id, 'report.json'),
-                os.path.join('output', 'report.json'),  # Fallback to default output
+                os.path.join(base_output, job_id, 'report.json'),
+                os.path.join(base_output, 'report.json'),  # Fallback to default output
             ]
             
             for path in possible_paths:
@@ -376,7 +453,7 @@ def get_crawl_results(job_id: str):
         
         # If job_id is 'default', try the default output location
         if job_id == 'default':
-            default_path = os.path.join('output', 'report.json')
+            default_path = os.path.join(base_output, 'report.json')
             if os.path.exists(default_path):
                 try:
                     with open(default_path, 'r', encoding='utf-8') as f:
@@ -391,6 +468,7 @@ def get_crawl_results(job_id: str):
 
 
 @app.route('/api/download/<job_id>/<file_type>')
+@login_required
 def download_file(job_id: str, file_type: str):
     """Download crawl results file."""
     file_path = None
@@ -415,9 +493,10 @@ def download_file(job_id: str, file_type: str):
             return jsonify({'error': 'Invalid file type'}), 400
         
         # Try different possible locations
+        base_output = app.config['UPLOAD_FOLDER']
         possible_paths = [
-            os.path.join('output', job_id, filename),
-            os.path.join('output', filename),  # Fallback to default output
+            os.path.join(base_output, job_id, filename),
+            os.path.join(base_output, filename),  # Fallback to default output
         ]
         
         for path in possible_paths:
@@ -432,6 +511,7 @@ def download_file(job_id: str, file_type: str):
 
 
 @app.route('/results/<job_id>')
+@login_required
 def results_page(job_id: str):
     """Display results page for a crawl job."""
     # Always render the page - let JavaScript handle missing results gracefully
@@ -454,7 +534,7 @@ def list_jobs():
         })
     
     # Also check for completed jobs in output directory
-    output_dir = 'output'
+    output_dir = app.config['UPLOAD_FOLDER']
     if os.path.exists(output_dir):
         for item in os.listdir(output_dir):
             item_path = os.path.join(output_dir, item)
@@ -493,8 +573,8 @@ def handle_disconnect():
 
 
 if __name__ == '__main__':
-    # Create output directory if it doesn't exist
-    os.makedirs('output', exist_ok=True)
+    # Output directory is already created in app initialization
+    pass
     
     # Run Flask app with SocketIO
     print("\n" + "="*60)
