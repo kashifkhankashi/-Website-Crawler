@@ -1,5 +1,59 @@
 /* Results Page Specific Styles */
 
+/* Header */
+.results-header {
+    margin-bottom: 30px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 20px 30px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.back-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3);
+}
+
+.back-button:hover {
+    transform: translateX(-3px);
+    box-shadow: 0 6px 12px rgba(74, 144, 226, 0.4);
+    color: white;
+}
+
+.back-button i {
+    font-size: 1.2rem;
+}
+
+.results-header h1 {
+    margin: 0;
+    color: var(--dark-color);
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .summary-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -79,28 +133,43 @@
 }
 
 .tab-btn {
-    padding: 12px 24px;
+    padding: 12px 20px;
     border: none;
     background: transparent;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-muted);
-    transition: all 0.3s;
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 8px;
+    position: relative;
 }
 
 .tab-btn:hover {
     background: var(--light-color);
     color: var(--primary-color);
+    transform: translateY(-1px);
 }
 
 .tab-btn.active {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: white;
+    box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3);
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 3px;
+    background: var(--primary-color);
+    border-radius: 2px;
 }
 
 /* Content Sections */
@@ -610,6 +679,115 @@ tbody tr:last-child td {
     display: flex;
     gap: 15px;
     flex-wrap: wrap;
+}
+
+/* External Links Styles */
+.external-link-item {
+    padding: 20px;
+    margin-bottom: 20px;
+    background: #f8f9ff;
+    border-left: 4px solid #4a90e2;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.external-link-item:hover {
+    background: #f0f2ff;
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.15);
+}
+
+.external-link-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.external-link-url {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.external-link-url i {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.external-link-url a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    word-break: break-all;
+    font-size: 1.05rem;
+}
+
+.external-link-url a:hover {
+    text-decoration: underline;
+}
+
+.external-link-count {
+    display: flex;
+    align-items: center;
+}
+
+.external-link-sources {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.external-link-sources strong {
+    color: var(--dark-color);
+    display: block;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+
+.source-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.source-list li {
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    background: white;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+.source-list li:hover {
+    background: #f8f9fa;
+    transform: translateX(5px);
+}
+
+.source-list li a {
+    color: var(--dark-color);
+    text-decoration: none;
+    font-weight: 500;
+    flex: 1;
+    min-width: 200px;
+}
+
+.source-list li a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+.source-status {
+    font-size: 0.85rem;
 }
 
 /* Responsive */

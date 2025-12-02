@@ -70,6 +70,7 @@ function displayAllSections(data) {
     displayBrokenLinks(data);
     displayDuplicates(data);
     displaySimilarity(data);
+    displayExternalLinks(data);
     displayStatistics(data);
 }
 
@@ -307,6 +308,155 @@ function displaySimilarity(data) {
         `;
         container.appendChild(pairDiv);
     });
+}
+
+// Display external links section
+function displayExternalLinks(data) {
+    const container = document.getElementById('externalLinksContainer');
+    const allExternalLinks = [];
+    
+    if (data.pages) {
+        data.pages.forEach(page => {
+            if (page.external_links && page.external_links.length > 0) {
+                page.external_links.forEach(linkUrl => {
+                    allExternalLinks.push({
+                        url: linkUrl,
+                        source_page: page.url,
+                        source_title: page.title,
+                        source_status: page.status_code
+                    });
+                });
+            }
+        });
+    }
+    
+    // Remove duplicates (same URL from different pages)
+    const uniqueLinks = {};
+    allExternalLinks.forEach(link => {
+        if (!uniqueLinks[link.url]) {
+            uniqueLinks[link.url] = {
+                url: link.url,
+                sources: []
+            };
+        }
+        uniqueLinks[link.url].sources.push({
+            page_url: link.source_page,
+            page_title: link.source_title,
+            page_status: link.source_status
+        });
+    });
+    
+    const totalLinks = Object.keys(uniqueLinks).length;
+    document.getElementById('externalLinksCount').textContent = `${totalLinks} unique links`;
+    
+    // Update summary card
+    const externalLinksTotal = document.getElementById('externalLinksTotal');
+    if (externalLinksTotal) {
+        externalLinksTotal.textContent = totalLinks;
+    }
+    
+    // Populate page filter
+    const pageFilter = document.getElementById('externalPageFilter');
+    if (pageFilter && data.pages) {
+        const currentOptions = pageFilter.innerHTML;
+        data.pages.forEach(page => {
+            const option = document.createElement('option');
+            option.value = page.url;
+            option.textContent = page.title || page.url;
+            pageFilter.appendChild(option);
+        });
+    }
+    
+    if (totalLinks === 0) {
+        container.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No external links found.</p></div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    Object.values(uniqueLinks).forEach((linkData, index) => {
+        const linkItem = document.createElement('div');
+        linkItem.className = 'external-link-item';
+        linkItem.innerHTML = `
+            <div class="external-link-header">
+                <div class="external-link-url">
+                    <i class="fas fa-external-link-alt"></i>
+                    <a href="${linkData.url}" target="_blank" rel="noopener noreferrer">${linkData.url}</a>
+                </div>
+                <div class="external-link-count">
+                    <span class="badge badge-info">${linkData.sources.length} page${linkData.sources.length > 1 ? 's' : ''}</span>
+                </div>
+            </div>
+            <div class="external-link-sources">
+                <strong>Found on:</strong>
+                <ul class="source-list">
+                    ${linkData.sources.map(source => `
+                        <li>
+                            <a href="${source.page_url}" target="_blank">${source.page_title || source.page_url}</a>
+                            <span class="source-status status-badge status-${source.page_status === 200 ? '200' : 'error'}">${source.page_status || 'Unknown'}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+        container.appendChild(linkItem);
+    });
+    
+    // Setup filter
+    setupExternalLinksFilter();
+}
+
+// Setup external links filter
+function setupExternalLinksFilter() {
+    const searchInput = document.getElementById('externalSearchInput');
+    const pageFilter = document.getElementById('externalPageFilter');
+    
+    const filterLinks = () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedPage = pageFilter.value;
+        
+        const linkItems = document.querySelectorAll('.external-link-item');
+        linkItems.forEach(item => {
+            const linkUrl = item.querySelector('.external-link-url a').textContent.toLowerCase();
+            const sources = item.querySelectorAll('.source-list a');
+            let show = true;
+            
+            // Search filter
+            if (searchTerm && !linkUrl.includes(searchTerm)) {
+                // Check if any source page matches
+                let sourceMatch = false;
+                sources.forEach(source => {
+                    if (source.textContent.toLowerCase().includes(searchTerm)) {
+                        sourceMatch = true;
+                    }
+                });
+                if (!sourceMatch) {
+                    show = false;
+                }
+            }
+            
+            // Page filter
+            if (selectedPage !== 'all') {
+                let pageMatch = false;
+                sources.forEach(source => {
+                    if (source.href === selectedPage) {
+                        pageMatch = true;
+                    }
+                });
+                if (!pageMatch) {
+                    show = false;
+                }
+            }
+            
+            item.style.display = show ? '' : 'none';
+        });
+    };
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', filterLinks);
+    }
+    if (pageFilter) {
+        pageFilter.addEventListener('change', filterLinks);
+    }
 }
 
 // Display statistics section
@@ -730,11 +880,18 @@ function showSection(sectionName) {
     });
     
     // Show selected section
-    document.getElementById(sectionName + '-section').classList.add('active');
+    const sectionElement = document.getElementById(sectionName + '-section');
+    if (sectionElement) {
+        sectionElement.classList.add('active');
+    }
     
     // Add active class to clicked tab
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        if (btn.textContent.toLowerCase().includes(sectionName.replace('-', ' '))) {
+        const btnText = btn.textContent.toLowerCase().trim();
+        const sectionMatch = sectionName.replace('-', ' ').replace('-', ' ');
+        if (btnText.includes(sectionMatch) || 
+            (sectionName === 'external-links' && btnText.includes('external')) ||
+            (sectionName === 'broken-links' && btnText.includes('broken'))) {
             btn.classList.add('active');
         }
     });

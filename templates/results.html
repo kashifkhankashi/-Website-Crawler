@@ -11,11 +11,15 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1><i class="fas fa-chart-bar"></i> Crawl Results</h1>
-            <a href="/" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Home
-            </a>
+        <header class="results-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <a href="/" class="back-button">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <h1><i class="fas fa-chart-bar"></i> Crawl Results</h1>
+                </div>
+            </div>
         </header>
 
         <main>
@@ -57,6 +61,15 @@
                         <p>Similar Content</p>
                     </div>
                 </div>
+                <div class="summary-card" onclick="showSection('external-links')">
+                    <div class="card-icon green">
+                        <i class="fas fa-external-link-alt"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3 id="externalLinksTotal">0</h3>
+                        <p>External Links</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Tabs Navigation -->
@@ -72,6 +85,9 @@
                 </button>
                 <button class="tab-btn" onclick="showSection('similarity')">
                     <i class="fas fa-project-diagram"></i> Similarity
+                </button>
+                <button class="tab-btn" onclick="showSection('external-links')">
+                    <i class="fas fa-external-link-alt"></i> External Links
                 </button>
                 <button class="tab-btn" onclick="showSection('statistics')">
                     <i class="fas fa-chart-pie"></i> Statistics
@@ -157,6 +173,25 @@
                     </div>
                     <div id="similarityContainer">
                         <p class="loading">Loading similarity data...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- External Links Section -->
+            <section id="external-links-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-external-link-alt"></i> External Links</h2>
+                        <span class="badge badge-info" id="externalLinksCount">0 links</span>
+                    </div>
+                    <div class="section-actions">
+                        <input type="text" id="externalSearchInput" placeholder="Search external links..." class="search-box">
+                        <select id="externalPageFilter" class="filter-select">
+                            <option value="all">All Pages</option>
+                        </select>
+                    </div>
+                    <div id="externalLinksContainer">
+                        <p class="loading">Loading external links...</p>
                     </div>
                 </div>
             </section>

@@ -155,9 +155,26 @@ function updateProgress(data) {
     // Handle completion
     if (data.status === 'completed') {
         if (loadingIcon) loadingIcon.style.display = 'none';
+        
+        // Reset button state
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-play"></i> Start Crawling';
+        }
+        
         setTimeout(() => {
             showResultsCard(data.job_id);
         }, 1000);
+    }
+    
+    // Handle errors - also reset button
+    if (data.status === 'error') {
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-play"></i> Start Crawling';
+        }
     }
 }
 
@@ -251,11 +268,13 @@ function showError(message) {
     }
     
     // Update progress message
-    const progressMessage = document.getElementById('progressMessage');
-    if (progressMessage) {
-        progressMessage.textContent = message;
-        progressMessage.style.color = '#dc3545';
+    const progressMessageText = document.getElementById('progressMessageText');
+    const loadingIcon = document.getElementById('loadingIcon');
+    if (progressMessageText) {
+        progressMessageText.textContent = message;
+        progressMessageText.style.color = '#dc3545';
     }
+    if (loadingIcon) loadingIcon.style.display = 'none';
     
     // Hide progress bar
     const progressFill = document.getElementById('progressFill');
@@ -266,6 +285,13 @@ function showError(message) {
     const progressText = document.getElementById('progressText');
     if (progressText) {
         progressText.textContent = 'Error';
+    }
+    
+    // Reset button
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start Crawling';
     }
 }
 
