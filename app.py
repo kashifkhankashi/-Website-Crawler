@@ -17,12 +17,35 @@ import uuid
 from crawl import CrawlerRunner
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-in-production'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['UPLOAD_FOLDER'] = 'output'
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Configure SocketIO for Vercel (serverless-friendly)
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    async_mode='threading',  # Use threading mode for better serverless compatibility
+    logger=False,
+    engineio_logger=False
+)
 
 # Store active crawls
 active_crawls: Dict[str, dict] = {}
+
+# Add error handlers to ensure JSON responses (important for Vercel)
+@app.errorhandler(404)
+def not_found(error):
+    """Return JSON for 404 errors."""
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Return JSON for 500 errors."""
+    return jsonify({'error': 'Internal server error'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Return JSON for any unhandled exceptions."""
+    return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 
 @app.route('/')
@@ -34,14 +57,20 @@ def index():
 @app.route('/api/start-crawl', methods=['POST'])
 def start_crawl():
     """Start a new crawl job."""
-    data = request.json
-    start_url = data.get('url', '').strip()
-    max_depth = int(data.get('max_depth', 10))
-    output_dir = data.get('output_dir', 'output')
-    clear_cache = data.get('clear_cache', True)  # Clear cache by default
-    
-    if not start_url:
-        return jsonify({'error': 'URL is required'}), 400
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+        
+        data = request.get_json() or {}
+        start_url = data.get('url', '').strip()
+        max_depth = int(data.get('max_depth', 10))
+        output_dir = data.get('output_dir', 'output')
+        clear_cache = data.get('clear_cache', True)  # Clear cache by default
+        
+        if not start_url:
+            return jsonify({'error': 'URL is required'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Invalid request: {str(e)}'}), 400
     
     # Auto-fix URL (add https:// if missing)
     if not start_url.startswith(('http://', 'https://')):
@@ -256,91 +285,109 @@ def run_crawl_async(job_id: str, start_url: str, max_depth: int, output_dir: str
 @app.route('/api/crawl-status/<job_id>')
 def get_crawl_status(job_id: str):
     """Get status of a crawl job."""
-    # Debug logging (can be removed in production)
-    if job_id not in active_crawls:
-        print(f"Job {job_id} not in active_crawls. Active jobs: {list(active_crawls.keys())[:3]}")
-    
-    if job_id not in active_crawls:
-        # Check if results exist (crawl might have completed before)
-        json_path = os.path.join('output', job_id, 'report.json')
-        if os.path.exists(json_path):
+    try:
+        # Debug logging (can be removed in production)
+        if job_id not in active_crawls:
+            print(f"Job {job_id} not in active_crawls. Active jobs: {list(active_crawls.keys())[:3]}")
+        
+        if job_id not in active_crawls:
+            # Check if results exist (crawl might have completed before)
+            json_path = os.path.join('output', job_id, 'report.json')
+            if os.path.exists(json_path):
+                return jsonify({
+                    'status': 'completed',
+                    'message': 'Crawl completed (results found)',
+                    'job_id': job_id,
+                    'progress': 100
+                })
+            
+            # Also check default output location
+            default_json_path = os.path.join('output', 'report.json')
+            if os.path.exists(default_json_path):
+                return jsonify({
+                    'status': 'completed',
+                    'message': 'Crawl completed (results found in default location)',
+                    'job_id': job_id,
+                    'progress': 100
+                })
+            
+            # Return a status indicating job not found
             return jsonify({
-                'status': 'completed',
-                'message': 'Crawl completed (results found)',
+                'status': 'not_found',
+                'message': f'Job {job_id} not found. It may have been removed or never started properly.',
                 'job_id': job_id,
-                'progress': 100
+                'error': True,
+                'suggestion': 'Please try starting a new crawl.'
             })
         
-        # Also check default output location
-        default_json_path = os.path.join('output', 'report.json')
-        if os.path.exists(default_json_path):
-            return jsonify({
-                'status': 'completed',
-                'message': 'Crawl completed (results found in default location)',
-                'job_id': job_id,
-                'progress': 100
-            })
-        
-        # Return a status indicating job not found
+        # Return current status
+        crawl_info = active_crawls[job_id]
         return jsonify({
-            'status': 'not_found',
-            'message': f'Job {job_id} not found. It may have been removed or never started properly.',
             'job_id': job_id,
-            'error': True,
-            'suggestion': 'Please try starting a new crawl.'
+            'status': crawl_info.get('status', 'unknown'),
+            'progress': crawl_info.get('progress', 0),
+            'message': crawl_info.get('message', ''),
+            'pages_crawled': crawl_info.get('pages_crawled', 0),
+            'links_found': crawl_info.get('links_found', 0)
         })
-    
-    return jsonify(active_crawls[job_id])
+    except Exception as e:
+        return jsonify({
+            'error': f'Error getting crawl status: {str(e)}',
+            'job_id': job_id
+        }), 500
 
 
 @app.route('/api/crawl-results/<job_id>')
 def get_crawl_results(job_id: str):
     """Get results of a completed crawl."""
-    json_path = None
-    
-    # First, try to get path from active_crawls
-    if job_id in active_crawls:
-        crawl_info = active_crawls[job_id]
-        if crawl_info['status'] != 'completed':
-            return jsonify({'error': 'Crawl not completed yet'}), 400
-        json_path = crawl_info.get('output_files', {}).get('json')
-    
-    # If not in active_crawls or path not found, try to find the file directly
-    if not json_path or not os.path.exists(json_path):
-        # Try different possible locations
-        possible_paths = [
-            os.path.join('output', job_id, 'report.json'),
-            os.path.join('output', 'report.json'),  # Fallback to default output
-        ]
+    try:
+        json_path = None
         
-        for path in possible_paths:
-            if os.path.exists(path):
-                json_path = path
-                break
-    
-    # Load JSON report if found
-    if json_path and os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                report_data = json.load(f)
-            return jsonify(report_data)
-        except json.JSONDecodeError as e:
-            return jsonify({'error': f'Invalid JSON file: {str(e)}'}), 500
-        except Exception as e:
-            return jsonify({'error': f'Error reading results: {str(e)}'}), 500
-    
-    # If job_id is 'default', try the default output location
-    if job_id == 'default':
-        default_path = os.path.join('output', 'report.json')
-        if os.path.exists(default_path):
+        # First, try to get path from active_crawls
+        if job_id in active_crawls:
+            crawl_info = active_crawls[job_id]
+            if crawl_info['status'] != 'completed':
+                return jsonify({'error': 'Crawl not completed yet'}), 400
+            json_path = crawl_info.get('output_files', {}).get('json')
+        
+        # If not in active_crawls or path not found, try to find the file directly
+        if not json_path or not os.path.exists(json_path):
+            # Try different possible locations
+            possible_paths = [
+                os.path.join('output', job_id, 'report.json'),
+                os.path.join('output', 'report.json'),  # Fallback to default output
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    json_path = path
+                    break
+        
+        # Load JSON report if found
+        if json_path and os.path.exists(json_path):
             try:
-                with open(default_path, 'r', encoding='utf-8') as f:
+                with open(json_path, 'r', encoding='utf-8') as f:
                     report_data = json.load(f)
                 return jsonify(report_data)
+            except json.JSONDecodeError as e:
+                return jsonify({'error': f'Invalid JSON file: {str(e)}'}), 500
             except Exception as e:
-                return jsonify({'error': f'Error reading default results: {str(e)}'}), 500
-    
-    return jsonify({'error': 'Results not found. The crawl may not have completed or the results were deleted.'}), 404
+                return jsonify({'error': f'Error reading results: {str(e)}'}), 500
+        
+        # If job_id is 'default', try the default output location
+        if job_id == 'default':
+            default_path = os.path.join('output', 'report.json')
+            if os.path.exists(default_path):
+                try:
+                    with open(default_path, 'r', encoding='utf-8') as f:
+                        report_data = json.load(f)
+                    return jsonify(report_data)
+                except Exception as e:
+                    return jsonify({'error': f'Error reading default results: {str(e)}'}), 500
+        
+        return jsonify({'error': 'Results not found. The crawl may not have completed or the results were deleted.'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error loading results: {str(e)}'}), 500
 
 
 @app.route('/api/download/<job_id>/<file_type>')
