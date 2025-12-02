@@ -13,6 +13,16 @@ from scrapy.utils.response import get_base_url
 
 from crawler.items import PageItem
 
+# Import performance analyzer (optional, may fail if requests not available)
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from performance_analyzer import PerformanceAnalyzer
+    PERFORMANCE_ANALYZER_AVAILABLE = True
+except ImportError:
+    PERFORMANCE_ANALYZER_AVAILABLE = False
+
 
 class SiteSpider(scrapy.Spider):
     """
@@ -62,6 +72,15 @@ class SiteSpider(scrapy.Spider):
             'internal_links': 0,
             'external_links': 0,
         }
+        
+        # Initialize performance analyzer if available
+        self.performance_analyzer = None
+        if PERFORMANCE_ANALYZER_AVAILABLE:
+            try:
+                self.performance_analyzer = PerformanceAnalyzer()
+            except Exception as e:
+                self.logger.warning(f"Performance analyzer initialization failed: {e}")
+                self.performance_analyzer = None
     
     def parse(self, response: HtmlResponse) -> scrapy.Request:
         """
@@ -73,19 +92,24 @@ class SiteSpider(scrapy.Spider):
         Yields:
             PageItem with extracted data and/or scrapy.Request for following links
         """
-        # Skip if already visited (shouldn't happen, but safety check)
+        # Normalize URL before checking visited (ensures trailing slash consistency)
         url = response.url
-        if url in self.visited_urls:
+        normalized_url = self._normalize_url(url)
+        if not normalized_url:
             return
         
-        self.visited_urls.add(url)
+        # Skip if already visited (using normalized URL)
+        if normalized_url in self.visited_urls:
+            return
+        
+        self.visited_urls.add(normalized_url)
         self.stats['pages_crawled'] += 1
         
         # Get current depth
         depth = response.meta.get('depth', 0)
         
-        # Extract content from the page
-        item = self._extract_content(response)
+        # Extract content from the page (will use normalized URL)
+        item = self._extract_content(response, normalized_url)
         
         # Check if we should continue crawling
         if depth < self.max_depth:
@@ -108,12 +132,13 @@ class SiteSpider(scrapy.Spider):
         
         yield item
     
-    def _extract_content(self, response: HtmlResponse) -> PageItem:
+    def _extract_content(self, response: HtmlResponse, normalized_url: str = None) -> PageItem:
         """
         Extract content from the HTML response.
         
         Args:
             response: The HTTP response
+            normalized_url: Normalized URL to use (if None, uses response.url)
             
         Returns:
             PageItem with extracted data
@@ -125,7 +150,7 @@ class SiteSpider(scrapy.Spider):
         for script in soup(["script", "style", "noscript"]):
             script.decompose()
         
-        # Extract title
+        # Extract title (HTML and fallbacks)
         title = ""
         if soup.title:
             title = soup.title.get_text().strip()
@@ -139,6 +164,41 @@ class SiteSpider(scrapy.Spider):
             meta_description = meta_desc_tag.get('content', '').strip()
         elif soup.find('meta', property='og:description'):
             meta_description = soup.find('meta', property='og:description').get('content', '').strip()
+
+        # Extract additional on-page SEO signals
+        # Meta keywords (legacy but still useful for audits)
+        meta_keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
+        meta_keywords = meta_keywords_tag.get('content', '').strip() if meta_keywords_tag else ""
+
+        # Canonical URL
+        canonical_tag = soup.find('link', rel=lambda v: v and 'canonical' in v.lower())
+        canonical_url = canonical_tag.get('href', '').strip() if canonical_tag else ""
+
+        # Heading tags
+        def _collect_headings(tag_name: str) -> List[str]:
+            return [
+                h.get_text(strip=True)
+                for h in soup.find_all(tag_name)
+                if h.get_text(strip=True)
+            ]
+
+        h1_tags = _collect_headings('h1')
+        h2_tags = _collect_headings('h2')
+        h3_tags = _collect_headings('h3')
+
+        # Open Graph tags
+        og_tags = {}
+        for meta in soup.find_all('meta', attrs={'property': True}):
+            prop = meta.get('property', '').strip()
+            if prop.startswith('og:'):
+                og_tags[prop] = meta.get('content', '').strip()
+
+        # Twitter Card tags
+        twitter_tags = {}
+        for meta in soup.find_all('meta', attrs={'name': True}):
+            name = meta.get('name', '').strip()
+            if name.startswith('twitter:'):
+                twitter_tags[name] = meta.get('content', '').strip()
         
         # Remove navigation, header, footer elements
         for element in soup.find_all(['nav', 'header', 'footer', 'aside']):
@@ -166,10 +226,18 @@ class SiteSpider(scrapy.Spider):
         
         # Create item
         item = PageItem()
-        item['url'] = response.url
+        # Use normalized URL to ensure consistency (trailing slash handling)
+        item['url'] = normalized_url if normalized_url else response.url
         item['status_code'] = response.status
         item['title'] = title
         item['meta_description'] = meta_description
+        item['meta_keywords'] = meta_keywords
+        item['canonical_url'] = canonical_url
+        item['h1_tags'] = h1_tags
+        item['h2_tags'] = h2_tags
+        item['h3_tags'] = h3_tags
+        item['og_tags'] = og_tags
+        item['twitter_tags'] = twitter_tags
         item['text_content'] = text_content
         item['internal_links'] = links['internal']
         item['external_links'] = links['external']
@@ -180,6 +248,20 @@ class SiteSpider(scrapy.Spider):
             redirect_url = response.headers.get('Location', b'').decode('utf-8', errors='ignore')
             if redirect_url:
                 item['redirect_url'] = urljoin(response.url, redirect_url)
+        
+        # Run performance analysis if analyzer is available
+        if self.performance_analyzer:
+            try:
+                performance_results = self.performance_analyzer.analyze_page(
+                    response.text,
+                    normalized_url if normalized_url else response.url
+                )
+                item['performance_analysis'] = performance_results
+            except Exception as e:
+                self.logger.warning(f"Performance analysis failed for {response.url}: {e}")
+                item['performance_analysis'] = {}
+        else:
+            item['performance_analysis'] = {}
         
         return item
 
@@ -288,6 +370,7 @@ class SiteSpider(scrapy.Spider):
     def _normalize_url(self, url: str) -> Optional[str]:
         """
         Normalize URL by removing trailing slashes and converting to lowercase.
+        Ensures URLs with/without trailing slashes are treated as the same.
         
         Args:
             url: URL to normalize
@@ -310,8 +393,13 @@ class SiteSpider(scrapy.Spider):
             if any(path.endswith(f'.{ext}') for ext in self.settings.get('IGNORED_EXTENSIONS', [])):
                 return None
             
-            # Normalize path (remove trailing slash except for root)
-            path = parsed.path.rstrip('/') or '/'
+            # Normalize path: always remove trailing slash, but keep root as '/'
+            # This ensures https://example.com/ and https://example.com normalize to the same
+            path = parsed.path.rstrip('/')
+            # If path is empty after stripping, it was root or empty - normalize to empty string
+            # (we'll handle root path specially)
+            if not path:
+                path = ''  # Empty path (not '/') - this ensures consistency
             
             # Reconstruct URL
             normalized = urlunparse((

@@ -19,11 +19,12 @@ ROBOTSTXT_OBEY = True
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
-DOWNLOAD_DELAY = 1  # 1 second delay between requests
+# Slightly aggressive but still polite defaults to improve crawl speed.
+DOWNLOAD_DELAY = 0.25  # 250ms delay between requests
 
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = 2
-CONCURRENT_REQUESTS_PER_IP = 2
+CONCURRENT_REQUESTS_PER_DOMAIN = 4
+CONCURRENT_REQUESTS_PER_IP = 4
 
 # Disable cookies (enabled by default)
 COOKIES_ENABLED = False
@@ -61,9 +62,9 @@ ITEM_PIPELINES = {
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 AUTOTHROTTLE_ENABLED = True
-AUTOTHROTTLE_START_DELAY = 1
-AUTOTHROTTLE_MAX_DELAY = 10
-AUTOTHROTTLE_TARGET_CONCURRENCY = 2.0
+AUTOTHROTTLE_START_DELAY = 0.5
+AUTOTHROTTLE_MAX_DELAY = 5
+AUTOTHROTTLE_TARGET_CONCURRENCY = 4.0
 AUTOTHROTTLE_DEBUG = False
 
 # Enable and configure HTTP caching

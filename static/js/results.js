@@ -92,6 +92,97 @@ function displayAllSections(data) {
     displayImageAnalyzer(data);
     displayKeywords(data);
     setupKeywordSearch(data);
+    displayMetaSeo(data);
+    displayPerformanceAnalysis(data);
+}
+
+// Meta tag & on-page SEO analysis section
+function displayMetaSeo(data) {
+    const tbody = document.getElementById('metaSeoTableBody');
+    const filter = document.getElementById('metaIssueFilter');
+    if (!tbody || !filter || !data.pages) return;
+
+    // Build rows with computed meta info and issue flags
+    tbody.innerHTML = '';
+    data.pages.forEach(page => {
+        const title = page.title || '';
+        const desc = page.meta_description || '';
+        const titleLen = title.length;
+        const descLen = desc.length;
+        const hasCanonical = !!(page.canonical_url && page.canonical_url.trim());
+        const h1Count = Array.isArray(page.h1_tags) ? page.h1_tags.length : 0;
+        const h2Count = Array.isArray(page.h2_tags) ? page.h2_tags.length : 0;
+        const h3Count = Array.isArray(page.h3_tags) ? page.h3_tags.length : 0;
+        const ogCount = page.og_tags ? Object.keys(page.og_tags).length : 0;
+        const twitterCount = page.twitter_tags ? Object.keys(page.twitter_tags).length : 0;
+
+        const issues = {
+            missingTitle: titleLen === 0 || titleLen < 10,
+            longTitle: titleLen > 65,
+            missingDescription: descLen === 0 || descLen < 40,
+            longDescription: descLen > 160,
+            missingCanonical: !hasCanonical,
+            missingOg: ogCount === 0,
+            missingTwitter: twitterCount === 0
+        };
+
+        const tr = document.createElement('tr');
+        tr.dataset.issues = JSON.stringify(issues);
+
+        tr.innerHTML = `
+            <td>
+                <a href="${page.url}" target="_blank">${page.title || page.url}</a>
+            </td>
+            <td>${titleLen || 0}</td>
+            <td>${descLen || 0}</td>
+            <td>${hasCanonical ? 'Yes' : 'No'}</td>
+            <td>${h1Count} / ${h2Count} / ${h3Count}</td>
+            <td>${ogCount}</td>
+            <td>${twitterCount}</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    // Simple filter based on common SEO issues
+    const applyFilter = () => {
+        const value = filter.value;
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach(row => {
+            const issues = JSON.parse(row.dataset.issues || '{}');
+            let show = true;
+
+            switch (value) {
+                case 'missing-title':
+                    show = !!issues.missingTitle;
+                    break;
+                case 'long-title':
+                    show = !!issues.longTitle;
+                    break;
+                case 'missing-description':
+                    show = !!issues.missingDescription;
+                    break;
+                case 'long-description':
+                    show = !!issues.longDescription;
+                    break;
+                case 'missing-canonical':
+                    show = !!issues.missingCanonical;
+                    break;
+                case 'missing-og':
+                    show = !!issues.missingOg;
+                    break;
+                case 'missing-twitter':
+                    show = !!issues.missingTwitter;
+                    break;
+                default:
+                    show = true;
+            }
+
+            row.style.display = show ? '' : 'none';
+        });
+    };
+
+    filter.addEventListener('change', applyFilter);
 }
 
 // Image analyzer section
@@ -339,7 +430,7 @@ function showKeywordPages(keyword, data) {
     });
 }
 
-// Advanced keyword search: user enters any keyword and sees counts per page
+// Advanced keyword search: user enters any keyword (single or multi-word phrase) and sees counts per page
 function setupKeywordSearch(data) {
     const input = document.getElementById('keywordSearchTermInput');
     const btn = document.getElementById('keywordSearchBtn');
@@ -351,17 +442,71 @@ function setupKeywordSearch(data) {
         const term = rawTerm.trim().toLowerCase();
 
         if (!term) {
-            tbody.innerHTML = '<tr><td colspan="5">Please enter a keyword to search for.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">Please enter a keyword or phrase to search for.</td></tr>';
             return;
         }
 
+        // Show loading state
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Searching...</td></tr>';
+
         const results = [];
+        const termWords = term.split(/\s+/).filter(w => w.length > 0); // Split into words
+        const isMultiWord = termWords.length > 1;
 
         data.pages.forEach(page => {
-            if (!page.keywords || !page.keywords.term_counts) return;
-            const count = page.keywords.term_counts[term] || 0;
+            // Skip pages without text content
+            if (!page.text_content || !page.text_content.trim()) {
+                return;
+            }
+            
+            const pageText = page.text_content.toLowerCase();
+            let count = 0;
+            
+            if (isMultiWord) {
+                // Multi-word phrase search: count occurrences of the full phrase
+                // Escape special regex characters and search for exact phrase
+                try {
+                    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const phraseRegex = new RegExp(escapedTerm, 'gi');
+                    const matches = pageText.match(phraseRegex);
+                    count = matches ? matches.length : 0;
+                } catch (e) {
+                    console.warn('Regex error for phrase:', term, e);
+                    // Fallback: simple string count
+                    count = (pageText.match(new RegExp(term, 'gi')) || []).length;
+                }
+            } else {
+                // Single word search: try term_counts first (faster), then fallback to text search
+                let foundInTermCounts = false;
+                
+                if (page.keywords && page.keywords.term_counts && typeof page.keywords.term_counts === 'object') {
+                    // Check if term exists in term_counts (exact match, already lowercase)
+                    if (term in page.keywords.term_counts) {
+                        count = page.keywords.term_counts[term];
+                        foundInTermCounts = true;
+                    }
+                }
+                
+                // If not found in term_counts, search text directly (handles edge cases)
+                if (!foundInTermCounts) {
+                    try {
+                        // Use word boundary regex for exact word matches
+                        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const wordRegex = new RegExp('\\b' + escapedTerm + '\\b', 'gi');
+                        const matches = pageText.match(wordRegex);
+                        count = matches ? matches.length : 0;
+                    } catch (e) {
+                        console.warn('Regex error for keyword:', term, e);
+                        // Fallback: simple string count (less accurate but works)
+                        const simpleMatches = pageText.split(term).length - 1;
+                        count = Math.max(0, simpleMatches);
+                    }
+                }
+            }
+            
             if (count > 0) {
                 const wordCount = page.word_count || 0;
+                // Calculate percentage based on total words, not phrase count
                 const pct = wordCount > 0 ? (count / wordCount) * 100 : 0;
                 results.push({
                     url: page.url,
@@ -374,7 +519,8 @@ function setupKeywordSearch(data) {
         });
 
         if (results.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5">Keyword "<strong>${term}</strong>" was not found on any page.</td></tr>`;
+            const searchType = isMultiWord ? 'phrase' : 'keyword';
+            tbody.innerHTML = `<tr><td colspan="5">${searchType.charAt(0).toUpperCase() + searchType.slice(1)} "<strong>${term}</strong>" was not found on any page.</td></tr>`;
             return;
         }
 
@@ -1333,4 +1479,249 @@ function generateTextReport(data) {
     }
     
     return report;
+}
+
+// Display performance analysis section
+function displayPerformanceAnalysis(data) {
+    if (!data.pages || data.pages.length === 0) return;
+    
+    const heavyImagesContainer = document.getElementById('heavyImagesContainer');
+    const slowJsCssContainer = document.getElementById('slowJsCssContainer');
+    const slowHtmlSectionsContainer = document.getElementById('slowHtmlSectionsContainer');
+    const slowComponentsContainer = document.getElementById('slowComponentsContainer');
+    const renderBlockingContainer = document.getElementById('renderBlockingContainer');
+    const pageFilter = document.getElementById('performancePageFilter');
+    
+    if (!heavyImagesContainer || !slowJsCssContainer || !slowHtmlSectionsContainer || 
+        !slowComponentsContainer || !renderBlockingContainer) return;
+    
+    // Collect all performance data from all pages
+    const allHeavyImages = [];
+    const allSlowJsCss = [];
+    const allSlowHtmlSections = [];
+    const allSlowComponents = [];
+    const allRenderBlocking = [];
+    
+    data.pages.forEach(page => {
+        const perf = page.performance_analysis || {};
+        const pageUrl = page.url;
+        const pageTitle = page.title || pageUrl;
+        
+        // Heavy images
+        if (perf.heavy_images && perf.heavy_images.length > 0) {
+            perf.heavy_images.forEach(img => {
+                allHeavyImages.push({
+                    ...img,
+                    page_url: pageUrl,
+                    page_title: pageTitle
+                });
+            });
+        }
+        
+        // Slow JS/CSS
+        if (perf.slow_js_css && perf.slow_js_css.length > 0) {
+            perf.slow_js_css.forEach(file => {
+                allSlowJsCss.push({
+                    ...file,
+                    page_url: pageUrl,
+                    page_title: pageTitle
+                });
+            });
+        }
+        
+        // Slow HTML sections
+        if (perf.slow_html_sections && perf.slow_html_sections.length > 0) {
+            perf.slow_html_sections.forEach(section => {
+                allSlowHtmlSections.push({
+                    ...section,
+                    page_url: pageUrl,
+                    page_title: pageTitle
+                });
+            });
+        }
+        
+        // Slow components
+        if (perf.slow_components && perf.slow_components.length > 0) {
+            perf.slow_components.forEach(component => {
+                allSlowComponents.push({
+                    ...component,
+                    page_url: pageUrl,
+                    page_title: pageTitle
+                });
+            });
+        }
+        
+        // Render-blocking resources
+        if (perf.render_blocking_resources && perf.render_blocking_resources.length > 0) {
+            perf.render_blocking_resources.forEach(resource => {
+                allRenderBlocking.push({
+                    ...resource,
+                    page_url: pageUrl,
+                    page_title: pageTitle
+                });
+            });
+        }
+    });
+    
+    // Populate page filter
+    if (pageFilter && data.pages) {
+        data.pages.forEach(page => {
+            const option = document.createElement('option');
+            option.value = page.url;
+            option.textContent = page.title || page.url;
+            pageFilter.appendChild(option);
+        });
+    }
+    
+    // Display heavy images
+    if (allHeavyImages.length === 0) {
+        heavyImagesContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No heavy images detected.</p></div>';
+    } else {
+        let html = '<ul class="performance-list">';
+        allHeavyImages.slice(0, 50).forEach(img => {
+            const sizeDisplay = img.size_mb >= 1 ? `${img.size_mb.toFixed(2)} MB` : `${img.size_kb.toFixed(2)} KB`;
+            html += `
+                <li class="performance-item">
+                    <div class="performance-item-header">
+                        <strong>${sizeDisplay}</strong>
+                        <span class="badge badge-warning">Heavy</span>
+                    </div>
+                    <div class="performance-item-content">
+                        <div><strong>Image:</strong> <a href="${img.url}" target="_blank">${img.url.substring(0, 60)}${img.url.length > 60 ? '...' : ''}</a></div>
+                        <div><strong>Page:</strong> <a href="${img.page_url}" target="_blank">${img.page_title}</a></div>
+                        <div><strong>Location:</strong> ${img.location}</div>
+                        ${img.width && img.height ? `<div><strong>Dimensions:</strong> ${img.width}×${img.height}px</div>` : ''}
+                        <div><strong>Format:</strong> ${img.format}</div>
+                        <div class="performance-highlight" style="border: 2px solid #ffc107; padding: 5px; margin-top: 5px; background: #fff3cd;">
+                            <strong>HTML:</strong> <code>${img.html_snippet}</code>
+                        </div>
+                    </div>
+                </li>
+            `;
+        });
+        if (allHeavyImages.length > 50) {
+            html += `<li><em>... and ${allHeavyImages.length - 50} more heavy images</em></li>`;
+        }
+        html += '</ul>';
+        heavyImagesContainer.innerHTML = html;
+    }
+    
+    // Display slow JS/CSS
+    if (allSlowJsCss.length === 0) {
+        slowJsCssContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No large JS/CSS files detected.</p></div>';
+    } else {
+        let html = '<ul class="performance-list">';
+        allSlowJsCss.slice(0, 30).forEach(file => {
+            html += `
+                <li class="performance-item">
+                    <div class="performance-item-header">
+                        <strong>${file.size_kb.toFixed(2)} KB</strong>
+                        <span class="badge badge-info">${file.type}</span>
+                    </div>
+                    <div class="performance-item-content">
+                        <div><strong>File:</strong> <a href="${file.url}" target="_blank">${file.url.substring(0, 60)}${file.url.length > 60 ? '...' : ''}</a></div>
+                        <div><strong>Page:</strong> <a href="${file.page_url}" target="_blank">${file.page_title}</a></div>
+                        ${file.is_render_blocking ? '<div><span class="badge badge-danger">Render-Blocking</span></div>' : ''}
+                    </div>
+                </li>
+            `;
+        });
+        if (allSlowJsCss.length > 30) {
+            html += `<li><em>... and ${allSlowJsCss.length - 30} more files</em></li>`;
+        }
+        html += '</ul>';
+        slowJsCssContainer.innerHTML = html;
+    }
+    
+    // Display slow HTML sections
+    if (allSlowHtmlSections.length === 0) {
+        slowHtmlSectionsContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No problematic HTML sections detected.</p></div>';
+    } else {
+        let html = '<ul class="performance-list">';
+        allSlowHtmlSections.slice(0, 30).forEach(section => {
+            html += `
+                <li class="performance-item">
+                    <div class="performance-item-header">
+                        <strong>${section.element}</strong>
+                        <span class="badge badge-warning">Slow</span>
+                    </div>
+                    <div class="performance-item-content">
+                        <div><strong>Page:</strong> <a href="${section.page_url}" target="_blank">${section.page_title}</a></div>
+                        <div><strong>Tag:</strong> ${section.tag}</div>
+                        <div><strong>Issues:</strong> ${section.issues.join(', ')}</div>
+                        <div><strong>Nesting Depth:</strong> ${section.nesting_depth} levels</div>
+                        <div><strong>Children:</strong> ${section.children_count} elements</div>
+                        ${section.images_count > 0 ? `<div><strong>Images:</strong> ${section.images_count}</div>` : ''}
+                        <div class="performance-highlight" style="border: 2px solid #ffc107; padding: 5px; margin-top: 5px; background: #fff3cd;">
+                            <strong>HTML:</strong> <code>${section.html_snippet.substring(0, 200)}${section.html_snippet.length > 200 ? '...' : ''}</code>
+                        </div>
+                    </div>
+                </li>
+            `;
+        });
+        if (allSlowHtmlSections.length > 30) {
+            html += `<li><em>... and ${allSlowHtmlSections.length - 30} more sections</em></li>`;
+        }
+        html += '</ul>';
+        slowHtmlSectionsContainer.innerHTML = html;
+    }
+    
+    // Display slow components
+    if (allSlowComponents.length === 0) {
+        slowComponentsContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No slow components detected.</p></div>';
+    } else {
+        let html = '<ul class="performance-list">';
+        allSlowComponents.slice(0, 30).forEach(component => {
+            html += `
+                <li class="performance-item">
+                    <div class="performance-item-header">
+                        <strong>${component.type}</strong>
+                        <span class="badge badge-warning">Slow</span>
+                    </div>
+                    <div class="performance-item-content">
+                        <div><strong>Page:</strong> <a href="${component.page_url}" target="_blank">${component.page_title}</a></div>
+                        <div><strong>Location:</strong> ${component.location}</div>
+                        <div><strong>Issue:</strong> ${component.issue}</div>
+                        ${component.images_count !== undefined ? `<div><strong>Images:</strong> ${component.images_count}</div>` : ''}
+                        ${component.rows_count !== undefined ? `<div><strong>Rows:</strong> ${component.rows_count}</div>` : ''}
+                        ${component.src ? `<div><strong>Source:</strong> <a href="${component.src}" target="_blank">${component.src.substring(0, 50)}${component.src.length > 50 ? '...' : ''}</a></div>` : ''}
+                    </div>
+                </li>
+            `;
+        });
+        if (allSlowComponents.length > 30) {
+            html += `<li><em>... and ${allSlowComponents.length - 30} more components</em></li>`;
+        }
+        html += '</ul>';
+        slowComponentsContainer.innerHTML = html;
+    }
+    
+    // Display render-blocking resources
+    if (allRenderBlocking.length === 0) {
+        renderBlockingContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No render-blocking resources detected.</p></div>';
+    } else {
+        let html = '<ul class="performance-list">';
+        allRenderBlocking.forEach(resource => {
+            html += `
+                <li class="performance-item">
+                    <div class="performance-item-header">
+                        <strong>${resource.type}</strong>
+                        <span class="badge badge-danger">Render-Blocking</span>
+                    </div>
+                    <div class="performance-item-content">
+                        <div><strong>Resource:</strong> <a href="${resource.url}" target="_blank">${resource.url.substring(0, 60)}${resource.url.length > 60 ? '...' : ''}</a></div>
+                        <div><strong>Page:</strong> <a href="${resource.page_url}" target="_blank">${resource.page_title}</a></div>
+                        <div><strong>Size:</strong> ${resource.size_kb.toFixed(2)} KB</div>
+                        ${resource.has_async !== undefined ? `<div><strong>Async:</strong> ${resource.has_async ? 'Yes' : 'No'}</div>` : ''}
+                        ${resource.has_defer !== undefined ? `<div><strong>Defer:</strong> ${resource.has_defer ? 'Yes' : 'No'}</div>` : ''}
+                        <div class="performance-suggestion">
+                            <strong>💡 Suggestion:</strong> Add <code>async</code> or <code>defer</code> attribute to prevent render-blocking.
+                        </div>
+                    </div>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        renderBlockingContainer.innerHTML = html;
+    }
 }

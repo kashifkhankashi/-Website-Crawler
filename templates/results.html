@@ -90,6 +90,9 @@
                 <button class="tab-btn" onclick="showSection('external-links')">
                     <i class="fas fa-external-link-alt"></i> External Links
                 </button>
+                <button class="tab-btn" onclick="showSection('meta-seo')">
+                    <i class="fas fa-code"></i> Meta & SEO
+                </button>
                 <button class="tab-btn" onclick="showSection('image-analyzer')">
                     <i class="fas fa-image"></i> Image Analyzer
                 </button>
@@ -101,6 +104,9 @@
                 </button>
                 <button class="tab-btn" onclick="showSection('statistics')">
                     <i class="fas fa-chart-pie"></i> Statistics
+                </button>
+                <button class="tab-btn" onclick="showSection('performance')">
+                    <i class="fas fa-tachometer-alt"></i> Performance
                 </button>
             </div>
 
@@ -233,6 +239,53 @@
                 </div>
             </section>
 
+            <!-- Performance Analysis Section -->
+            <section id="performance-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-tachometer-alt"></i> Performance Analysis</h2>
+                        <p class="section-description">Detect slow-loading elements and performance bottlenecks</p>
+                    </div>
+                    <div class="section-actions">
+                        <select id="performancePageFilter" class="filter-select">
+                            <option value="all">All Pages</option>
+                        </select>
+                    </div>
+                    <div class="performance-grid">
+                        <div class="performance-column">
+                            <h3><i class="fas fa-image"></i> Heavy Images</h3>
+                            <div id="heavyImagesContainer">
+                                <p class="loading">Analyzing images...</p>
+                            </div>
+                        </div>
+                        <div class="performance-column">
+                            <h3><i class="fas fa-file-code"></i> Slow JS/CSS Files</h3>
+                            <div id="slowJsCssContainer">
+                                <p class="loading">Analyzing resources...</p>
+                            </div>
+                        </div>
+                        <div class="performance-column">
+                            <h3><i class="fas fa-code"></i> Slow HTML Sections</h3>
+                            <div id="slowHtmlSectionsContainer">
+                                <p class="loading">Analyzing structure...</p>
+                            </div>
+                        </div>
+                        <div class="performance-column">
+                            <h3><i class="fas fa-puzzle-piece"></i> Slow Components</h3>
+                            <div id="slowComponentsContainer">
+                                <p class="loading">Analyzing components...</p>
+                            </div>
+                        </div>
+                        <div class="performance-column full-width">
+                            <h3><i class="fas fa-ban"></i> Render-Blocking Resources</h3>
+                            <div id="renderBlockingContainer">
+                                <p class="loading">Checking render-blocking resources...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Image Analyzer Section -->
             <section id="image-analyzer-section" class="content-section">
                 <div class="card">
@@ -258,6 +311,47 @@
                                 <p class="loading">Finding duplicate image usage...</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Meta & On-Page SEO Section -->
+            <section id="meta-seo-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-code"></i> Meta & On-Page SEO</h2>
+                    </div>
+                    <div class="section-actions">
+                        <select id="metaIssueFilter" class="filter-select">
+                            <option value="all">All Pages</option>
+                            <option value="missing-title">Missing / Short Title</option>
+                            <option value="long-title">Title Too Long</option>
+                            <option value="missing-description">Missing Description</option>
+                            <option value="long-description">Description Too Long</option>
+                            <option value="missing-canonical">Missing Canonical</option>
+                            <option value="missing-og">Missing OG Tags</option>
+                            <option value="missing-twitter">Missing Twitter Tags</option>
+                        </select>
+                    </div>
+                    <div class="table-container">
+                        <table id="metaSeoTable">
+                            <thead>
+                                <tr>
+                                    <th>Page</th>
+                                    <th>Title Length</th>
+                                    <th>Description Length</th>
+                                    <th>Canon.</th>
+                                    <th>H1 / H2 / H3</th>
+                                    <th>OG Tags</th>
+                                    <th>Twitter Tags</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metaSeoTableBody">
+                                <tr>
+                                    <td colspan="7" class="loading">Analyzing meta tags and headings...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

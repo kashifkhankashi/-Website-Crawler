@@ -14,9 +14,16 @@ class PageItem(scrapy.Item):
     status_code = scrapy.Field()  # type: int
     redirect_url = scrapy.Field()  # type: Optional[str]
     
-    # Content information
+    # Content information / on-page SEO
     title = scrapy.Field()  # type: str
     meta_description = scrapy.Field()  # type: Optional[str]
+    meta_keywords = scrapy.Field()  # type: Optional[str]
+    canonical_url = scrapy.Field()  # type: Optional[str]
+    h1_tags = scrapy.Field()  # type: List[str]
+    h2_tags = scrapy.Field()  # type: List[str]
+    h3_tags = scrapy.Field()  # type: List[str]
+    og_tags = scrapy.Field()  # type: dict   # {'og:title': '...', ...}
+    twitter_tags = scrapy.Field()  # type: dict  # {'twitter:title': '...', ...}
     text_content = scrapy.Field()  # type: str
     word_count = scrapy.Field()  # type: int
     images = scrapy.Field()  # type: List[dict]  # [{'src': str, 'alt': str, 'width': int, 'height': int}]
@@ -33,4 +40,7 @@ class PageItem(scrapy.Item):
     
     # Timestamp
     crawled_at = scrapy.Field()  # type: str
+    
+    # Performance analysis
+    performance_analysis = scrapy.Field()  # type: Dict  # Performance analysis results
 

@@ -168,6 +168,7 @@ class ReportGenerator:
         report_data = {
             'crawl_date': datetime.now().isoformat(),
             'total_pages': len(items),
+            # robots.txt and technical SEO info can be extended later
             'pages': []
         }
 
@@ -210,6 +211,14 @@ class ReportGenerator:
                 'status_code': item.get('status_code', 0),
                 'title': item.get('title', ''),
                 'meta_description': item.get('meta_description', ''),
+                'meta_keywords': item.get('meta_keywords', ''),
+                'canonical_url': item.get('canonical_url', ''),
+                'h1_tags': item.get('h1_tags', []),
+                'h2_tags': item.get('h2_tags', []),
+                'h3_tags': item.get('h3_tags', []),
+                'og_tags': item.get('og_tags', {}),
+                'twitter_tags': item.get('twitter_tags', {}),
+                'text_content': item.get('text_content', ''),  # Include text content for keyword search
                 'word_count': item.get('word_count', 0),
                 'internal_links': item.get('internal_links', []),
                 'external_links': item.get('external_links', []),
@@ -220,7 +229,8 @@ class ReportGenerator:
                 'duplicate_urls': item.get('duplicate_urls', []),
                 'similarity_scores': similarity_scores,
                 'content_hash': item.get('content_hash', ''),
-                'crawled_at': item.get('crawled_at', '')
+                'crawled_at': item.get('crawled_at', ''),
+                'performance_analysis': item.get('performance_analysis', {})  # Include performance analysis
             }
 
             # Attach per-page keyword stats if available
