@@ -1,4 +1,4 @@
-# Siteliner Clone - Website Crawler
+# Website Crawler
 
 A Python + Scrapy based website crawler similar to Siteliner. This tool crawls internal pages of a domain, extracts text content, detects duplicate content, and reports broken links.
 
