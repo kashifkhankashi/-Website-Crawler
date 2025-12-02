@@ -26,12 +26,17 @@ async function handleFormSubmit(e) {
     
     const url = document.getElementById('url').value;
     const maxDepth = document.getElementById('max_depth').value;
-    const outputDir = document.getElementById('output_dir').value;
     const startBtn = document.getElementById('startBtn');
     
     // Disable button
     startBtn.disabled = true;
     startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+    
+    // Auto-fix URL (add https:// if missing)
+    let fixedUrl = url.trim();
+    if (!fixedUrl.match(/^https?:\/\//i)) {
+        fixedUrl = 'https://' + fixedUrl;
+    }
     
     try {
         const response = await fetch('/api/start-crawl', {
@@ -40,9 +45,9 @@ async function handleFormSubmit(e) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                url: url,
+                url: fixedUrl,
                 max_depth: parseInt(maxDepth),
-                output_dir: outputDir,
+                output_dir: 'output', // Fixed output directory
                 clear_cache: document.getElementById('clear_cache').checked
             })
         });
@@ -93,7 +98,10 @@ function showProgressCard() {
     document.getElementById('resultsCard').style.display = 'none';
     document.getElementById('progressFill').style.width = '0%';
     document.getElementById('progressText').textContent = '0%';
-    document.getElementById('progressMessage').textContent = 'Initializing...';
+    const progressMessageText = document.getElementById('progressMessageText');
+    const loadingIcon = document.getElementById('loadingIcon');
+    if (progressMessageText) progressMessageText.textContent = 'Initializing...';
+    if (loadingIcon) loadingIcon.style.display = 'inline-block';
 }
 
 // Update progress
@@ -102,18 +110,26 @@ function updateProgress(data) {
     
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
-    const progressMessage = document.getElementById('progressMessage');
+    const progressMessageText = document.getElementById('progressMessageText');
+    const loadingIcon = document.getElementById('loadingIcon');
     const stats = document.getElementById('stats');
     const errorContainer = document.getElementById('errorContainer');
     
-    // Update progress bar
+    // Update progress bar with smooth animation
     const progress = data.progress || 0;
     progressFill.style.width = progress + '%';
     progressText.textContent = progress + '%';
     
     // Update message
     if (data.message) {
-        progressMessage.textContent = data.message;
+        progressMessageText.textContent = data.message;
+        
+        // Show/hide loading icon based on status
+        if (data.status === 'completed' || data.status === 'error') {
+            if (loadingIcon) loadingIcon.style.display = 'none';
+        } else {
+            if (loadingIcon) loadingIcon.style.display = 'inline-block';
+        }
     }
     
     // Update stats
@@ -131,12 +147,14 @@ function updateProgress(data) {
     if (data.status === 'error') {
         errorContainer.style.display = 'block';
         errorContainer.innerHTML = '<strong>Error:</strong> ' + data.message;
+        if (loadingIcon) loadingIcon.style.display = 'none';
     } else {
         errorContainer.style.display = 'none';
     }
     
     // Handle completion
     if (data.status === 'completed') {
+        if (loadingIcon) loadingIcon.style.display = 'none';
         setTimeout(() => {
             showResultsCard(data.job_id);
         }, 1000);

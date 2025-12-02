@@ -291,7 +291,7 @@ class CrawlerRunner:
     Main crawler runner that orchestrates crawling, link checking, and reporting.
     """
     
-    def __init__(self, start_url: str, max_depth: int = 10, output_dir: str = 'output', use_subprocess: bool = False):
+    def __init__(self, start_url: str, max_depth: int = 10, output_dir: str = 'output', use_subprocess: bool = False, progress_file: str = None, job_id: str = None):
         """
         Initialize the crawler runner.
         
@@ -300,11 +300,15 @@ class CrawlerRunner:
             max_depth: Maximum crawl depth
             output_dir: Output directory for reports
             use_subprocess: If True, run crawl in subprocess (for web interface)
+            progress_file: File to write progress updates (for web interface)
+            job_id: Job ID for progress tracking (for web interface)
         """
         self.start_url = start_url
         self.max_depth = max_depth
         self.output_dir = output_dir
         self.use_subprocess = use_subprocess
+        self.progress_file = progress_file
+        self.job_id = job_id
         self.crawled_items: List[dict] = []
         self.all_internal_links: Set[str] = set()
     
@@ -349,16 +353,24 @@ class CrawlerRunner:
             import subprocess
             import json as json_module
             import tempfile
+            import threading
+            import time
             
             # Create a temporary script file
             script_file = os.path.join(tempfile.gettempdir(), f'crawl_{os.getpid()}_{id(self)}.py')
             result_file = os.path.join(tempfile.gettempdir(), f'crawl_results_{os.getpid()}_{id(self)}.json')
+            progress_file_path = self.progress_file or os.path.join(tempfile.gettempdir(), f'progress_{os.getpid()}_{id(self)}.json')
+            
+            # Ensure progress file directory exists
+            if self.progress_file:
+                os.makedirs(os.path.dirname(self.progress_file), exist_ok=True)
             
             try:
-                # Write script
+                # Write script with progress tracking
                 script_content = f'''import sys
 import os
 import json
+import time
 
 # Add current directory to path
 sys.path.insert(0, r"{os.getcwd().replace(chr(92), chr(92)+chr(92))}")
@@ -371,8 +383,34 @@ from crawler.pipelines import ItemStoragePipeline
 # Clear previous collections
 ItemStoragePipeline.clear()
 
+# Progress tracking function
+def update_progress():
+    items = ItemStoragePipeline.get_collected_items()
+    links = ItemStoragePipeline.get_collected_links()
+    progress_data = {{
+        "pages_crawled": len(items),
+        "links_found": len(links),
+        "timestamp": time.time()
+    }}
+    try:
+        with open(r"{progress_file_path.replace(chr(92), chr(92)+chr(92))}", "w") as f:
+            json.dump(progress_data, f)
+    except:
+        pass
+
+# Custom pipeline to track progress
+class ProgressPipeline:
+    def process_item(self, item, spider):
+        update_progress()
+        return item
+
 # Configure and run
 settings = get_project_settings()
+# Add progress pipeline at the end
+original_pipelines = settings.get("ITEM_PIPELINES", {{}})
+settings["ITEM_PIPELINES"] = original_pipelines.copy()
+settings["ITEM_PIPELINES"]["__main__.ProgressPipeline"] = 1000
+
 process = CrawlerProcess(settings)
 process.crawl(SiteSpider, start_url="{self.start_url}", max_depth={self.max_depth})
 process.start()
@@ -423,6 +461,13 @@ with open(r"{result_file.replace(chr(92), chr(92)+chr(92))}", "w", encoding="utf
                             os.remove(f)
                         except:
                             pass
+                # Keep progress file for a bit, then clean up
+                if os.path.exists(progress_file_path) and not self.progress_file:
+                    try:
+                        time.sleep(2)
+                        os.remove(progress_file_path)
+                    except:
+                        pass
         else:
             # Use CrawlerProcess for command line usage
             process = CrawlerProcess(settings)

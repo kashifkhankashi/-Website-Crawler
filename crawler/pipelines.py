@@ -14,6 +14,10 @@ from crawler.items import PageItem
 _collected_items = []
 _collected_links = set()
 
+# Progress tracking
+_progress_callback = None
+_total_pages_estimate = 0
+
 
 class ContentProcessingPipeline:
     """
@@ -52,6 +56,9 @@ class ContentProcessingPipeline:
         # Add timestamp
         item['crawled_at'] = datetime.now().isoformat()
         
+        # Report progress
+        self._report_progress()
+        
         return item
     
     def _normalize_text(self, text: str) -> str:
@@ -77,6 +84,26 @@ class ContentProcessingPipeline:
         text = text.strip()
         
         return text
+    
+    def _report_progress(self):
+        """Report progress to callback if available."""
+        global _progress_callback, _total_pages_estimate
+        if _progress_callback and callable(_progress_callback):
+            pages_crawled = len(_collected_items) + 1  # +1 for current item
+            # Estimate progress: 30% for crawling, 70% for processing
+            if _total_pages_estimate > 0:
+                crawl_progress = min(30, (pages_crawled / _total_pages_estimate) * 30)
+            else:
+                crawl_progress = min(25, pages_crawled * 2)  # 2% per page up to 25%
+            
+            try:
+                _progress_callback({
+                    'progress': int(crawl_progress),
+                    'pages_crawled': pages_crawled,
+                    'message': f'Crawling... Found {pages_crawled} pages'
+                })
+            except:
+                pass
 
 
 class DuplicateDetectionPipeline:
@@ -208,3 +235,15 @@ class ItemStoragePipeline:
         global _collected_items, _collected_links
         _collected_items = []
         _collected_links = set()
+    
+    @staticmethod
+    def set_progress_callback(callback):
+        """Set callback function for progress updates."""
+        global _progress_callback
+        _progress_callback = callback
+    
+    @staticmethod
+    def set_total_pages_estimate(estimate: int):
+        """Set estimated total pages for progress calculation."""
+        global _total_pages_estimate
+        _total_pages_estimate = estimate

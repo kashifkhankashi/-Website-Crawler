@@ -43,6 +43,10 @@ def start_crawl():
     if not start_url:
         return jsonify({'error': 'URL is required'}), 400
     
+    # Auto-fix URL (add https:// if missing)
+    if not start_url.startswith(('http://', 'https://')):
+        start_url = 'https://' + start_url
+    
     # Clear HTTP cache if requested
     if clear_cache:
         cache_dir = os.path.join('httpcache', urlparse(start_url).netloc.replace('.', '_'))
@@ -96,30 +100,120 @@ def start_crawl():
 def run_crawl_async(job_id: str, start_url: str, max_depth: int, output_dir: str):
     """Run crawl in background thread and emit progress updates."""
     try:
-        # Update status
+        # Update status - Initializing
+        active_crawls[job_id]['status'] = 'initializing'
+        active_crawls[job_id]['message'] = 'Initializing crawler...'
+        active_crawls[job_id]['progress'] = 5
+        
+        socketio.emit('progress', {
+            'job_id': job_id,
+            'status': 'initializing',
+            'message': 'Initializing crawler...',
+            'progress': 5
+        })
+        
+        import time
+        time.sleep(0.5)  # Brief delay to show initialization
+        
+        # Update status - Starting crawl
         active_crawls[job_id]['status'] = 'crawling'
-        active_crawls[job_id]['message'] = 'Crawling website...'
+        active_crawls[job_id]['message'] = 'Starting to crawl website...'
         active_crawls[job_id]['progress'] = 10
         
         socketio.emit('progress', {
             'job_id': job_id,
             'status': 'crawling',
-            'message': 'Crawling website...',
+            'message': 'Starting to crawl website...',
             'progress': 10
         })
         
-        # Run crawler
+        # Run crawler in subprocess with progress tracking
         from crawl import CrawlerRunner
+        
+        # Track progress by monitoring output directory
+        progress_file = os.path.join(output_dir, 'progress.json')
+        
         runner = CrawlerRunner(
             start_url=start_url,
             max_depth=max_depth,
             output_dir=output_dir,
-            use_subprocess=True
+            use_subprocess=True,
+            progress_file=progress_file,
+            job_id=job_id
         )
         
+        # Start progress monitoring thread
+        def monitor_progress():
+            last_pages = 0
+            max_iterations = 3600  # Max 1 hour
+            iteration = 0
+            while active_crawls[job_id]['status'] in ['crawling', 'initializing', 'processing'] and iteration < max_iterations:
+                try:
+                    # Check if progress file exists and read it
+                    if os.path.exists(progress_file):
+                        with open(progress_file, 'r') as f:
+                            progress_data = json.load(f)
+                            pages = progress_data.get('pages_crawled', 0)
+                            links = progress_data.get('links_found', 0)
+                            
+                            if pages > last_pages or pages > 0:
+                                # Calculate progress: 10-60% for crawling
+                                estimated_total = max(20, pages * 2)  # Estimate based on current pages
+                                crawl_progress = min(60, 10 + (pages / estimated_total) * 50)
+                                
+                                active_crawls[job_id]['pages_crawled'] = pages
+                                active_crawls[job_id]['links_found'] = links
+                                active_crawls[job_id]['progress'] = int(crawl_progress)
+                                active_crawls[job_id]['message'] = f'Crawling... Found {pages} pages, {links} links'
+                                
+                                socketio.emit('progress', {
+                                    'job_id': job_id,
+                                    'status': 'crawling',
+                                    'message': f'Crawling... Found {pages} pages, {links} links',
+                                    'progress': int(crawl_progress),
+                                    'pages_crawled': pages,
+                                    'links_found': links
+                                })
+                                
+                                last_pages = pages
+                except Exception as e:
+                    pass
+                iteration += 1
+                time.sleep(1)  # Check every second
+        
+        monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
+        monitor_thread.start()
+        
+        # Run the crawl
         runner.run()
         
-        # Update status
+        # Update status - Processing
+        active_crawls[job_id]['status'] = 'processing'
+        active_crawls[job_id]['message'] = 'Processing results and checking links...'
+        active_crawls[job_id]['progress'] = 70
+        
+        socketio.emit('progress', {
+            'job_id': job_id,
+            'status': 'processing',
+            'message': 'Processing results and checking links...',
+            'progress': 70
+        })
+        
+        time.sleep(0.5)
+        
+        # Update status - Generating reports
+        active_crawls[job_id]['status'] = 'generating'
+        active_crawls[job_id]['message'] = 'Generating reports...'
+        active_crawls[job_id]['progress'] = 90
+        
+        socketio.emit('progress', {
+            'job_id': job_id,
+            'status': 'generating',
+            'message': 'Generating reports...',
+            'progress': 90
+        })
+        
+        # Update status - Completed
         active_crawls[job_id]['status'] = 'completed'
         active_crawls[job_id]['message'] = 'Crawl completed successfully!'
         active_crawls[job_id]['progress'] = 100
