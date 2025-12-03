@@ -7,6 +7,7 @@ import json
 import csv
 import threading
 import time
+import io
 from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
@@ -611,6 +612,103 @@ def results_page(job_id: str):
     """Display results page for a crawl job."""
     # Always render the page - let JavaScript handle missing results gracefully
     return render_template('results.html', job_id=job_id)
+
+
+@app.route('/api/analyze-competitors', methods=['POST'])
+@login_required
+def analyze_competitors():
+    """Analyze and compare two competitor URLs."""
+    try:
+        data = request.get_json()
+        url1 = data.get('url1', '').strip()
+        url2 = data.get('url2', '').strip()
+        
+        if not url1 or not url2:
+            return jsonify({'error': 'Both URLs are required'}), 400
+        
+        # Validate URLs
+        try:
+            from urllib.parse import urlparse
+            parsed1 = urlparse(url1)
+            parsed2 = urlparse(url2)
+            if not parsed1.scheme or not parsed1.netloc:
+                url1 = 'https://' + url1
+            if not parsed2.scheme or not parsed2.netloc:
+                url2 = 'https://' + url2
+        except:
+            return jsonify({'error': 'Invalid URL format'}), 400
+        
+        # Import advanced competitor analyzer
+        try:
+            from advanced_competitor_analyzer import AdvancedCompetitorAnalyzer
+            # Get PageSpeed API key from environment if available
+            pagespeed_api_key = os.environ.get('PAGESPEED_API_KEY', None)
+            analyzer = AdvancedCompetitorAnalyzer(pagespeed_api_key=pagespeed_api_key)
+            results = analyzer.analyze_competitors(url1, url2)
+            return jsonify(results)
+        except ImportError:
+            # Fallback to basic analyzer
+            try:
+                from competitor_analyzer import CompetitorAnalyzer
+                analyzer = CompetitorAnalyzer()
+                results = analyzer.analyze_competitors(url1, url2)
+                return jsonify(results)
+            except ImportError:
+                return jsonify({'error': 'Competitor analyzer not available'}), 500
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': f'Error: {str(e)}'}), 500
+
+
+@app.route('/api/export-competitor-analysis', methods=['POST'])
+@login_required
+def export_competitor_analysis():
+    """Export competitor analysis to CSV/JSON/TXT"""
+    try:
+        data = request.get_json()
+        analysis_data = data.get('data')
+        export_format = data.get('format', 'csv')  # csv, json, txt
+        
+        if not analysis_data:
+            return jsonify({'error': 'Analysis data is required'}), 400
+        
+        from export_utils import ExportUtils
+        
+        if export_format == 'csv':
+            csv_content = ExportUtils.export_to_csv(analysis_data)
+            return send_file(
+                io.BytesIO(csv_content.encode('utf-8')),
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f'competitor_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            )
+        elif export_format == 'json':
+            json_content = ExportUtils.export_to_json(analysis_data, pretty=True)
+            return send_file(
+                io.BytesIO(json_content.encode('utf-8')),
+                mimetype='application/json',
+                as_attachment=True,
+                download_name=f'competitor_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+            )
+        elif export_format == 'txt':
+            txt_content = ExportUtils.generate_summary_report(analysis_data)
+            return send_file(
+                io.BytesIO(txt_content.encode('utf-8')),
+                mimetype='text/plain',
+                as_attachment=True,
+                download_name=f'competitor_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+            )
+        else:
+            return jsonify({'error': 'Invalid format. Use csv, json, or txt'}), 400
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500
 
 
 @app.route('/api/list-jobs')

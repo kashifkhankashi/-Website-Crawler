@@ -283,33 +283,39 @@ function displayImageAnalyzer(data) {
 // Display keyword analysis section
 function displayKeywords(data) {
     const tbody = document.getElementById('keywordsTableBody');
-    const detailsContainer = document.getElementById('keywordPageDetails');
     const pageFilter = document.getElementById('keywordPageFilter');
     const searchInput = document.getElementById('keywordSearchInput');
 
-    if (!tbody || !detailsContainer || !pageFilter || !searchInput) return;
+    if (!tbody || !pageFilter || !searchInput) return;
 
     const keywordAnalysis = data.keyword_analysis || {};
     const globalTop = keywordAnalysis.global_top_keywords || [];
 
     // Populate global keyword table
     if (globalTop.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4">No keyword data available. Try running a new crawl.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">No keyword data available. Try running a new crawl.</td></tr>';
     } else {
         tbody.innerHTML = '';
         globalTop.forEach(k => {
             const tr = document.createElement('tr');
             tr.dataset.keyword = k.keyword.toLowerCase();
             tr.innerHTML = `
-                <td>${k.keyword}</td>
+                <td><strong>${k.keyword}</strong></td>
                 <td>${k.doc_count}</td>
                 <td>${k.total_count}</td>
                 <td>${k.idf.toFixed(4)}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="showKeywordPagesInModal('${k.keyword}', window.crawlData)" title="View pages using this keyword">
+                        <i class="fas fa-eye"></i> View Pages
+                    </button>
+                </td>
             `;
-            tr.onclick = () => showKeywordPages(k.keyword, data);
             tbody.appendChild(tr);
         });
     }
+    
+    // Store data globally for modal access
+    window.crawlData = data;
 
     // Populate page filter
     if (data.pages) {
@@ -348,19 +354,19 @@ function displayKeywords(data) {
 
             row.style.display = show ? '' : 'none';
         });
-
-        // Clear details when filters change
-        detailsContainer.innerHTML = '';
     };
 
     searchInput.addEventListener('input', applyFilter);
     pageFilter.addEventListener('change', applyFilter);
 }
 
-// Show pages where a given keyword appears, with ratios, in the keyword section
-function showKeywordPages(keyword, data) {
-    const container = document.getElementById('keywordPageDetails');
-    if (!container || !data.pages) return;
+// Show pages where a given keyword appears in a modal
+function showKeywordPagesInModal(keyword, data) {
+    const modal = document.getElementById('keywordModal');
+    const modalTitle = document.getElementById('keywordModalTitle');
+    const modalBody = document.getElementById('keywordModalBody');
+    
+    if (!modal || !modalTitle || !modalBody || !data || !data.pages) return;
 
     const lower = keyword.toLowerCase();
     const pagesWithKeyword = [];
@@ -375,14 +381,23 @@ function showKeywordPages(keyword, data) {
                     word_count: page.word_count,
                     keyword_count: entry.count,
                     tf_idf: entry.tf_idf,
-                    keyword_ratio: page.keywords.keyword_ratio
+                    keyword_ratio: page.keywords.keyword_ratio || 0
                 });
             }
         }
     });
 
+    // Update modal title
+    modalTitle.innerHTML = `<i class="fas fa-key"></i> Keyword: "<strong>${keyword}</strong>"`;
+
     if (pagesWithKeyword.length === 0) {
-        container.innerHTML = `<p>No pages found using keyword "<strong>${keyword}</strong>".</p>`;
+        modalBody.innerHTML = `
+            <div class="keyword-empty-state">
+                <i class="fas fa-search" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.1rem; color: var(--text-muted);">No pages found using keyword "<strong>${keyword}</strong>".</p>
+            </div>
+        `;
+        modal.style.display = 'block';
         return;
     }
 
@@ -390,8 +405,23 @@ function showKeywordPages(keyword, data) {
     pagesWithKeyword.sort((a, b) => b.tf_idf - a.tf_idf);
 
     let html = `
-        <div class="keyword-detail-card">
-            <h3>Pages using "<span>${keyword}</span>"</h3>
+        <div class="keyword-modal-header">
+            <div class="keyword-stats">
+                <div class="stat-item">
+                    <span class="stat-value">${pagesWithKeyword.length}</span>
+                    <span class="stat-label">Pages Found</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${pagesWithKeyword.reduce((sum, p) => sum + p.keyword_count, 0)}</span>
+                    <span class="stat-label">Total Occurrences</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${pagesWithKeyword[0].tf_idf.toFixed(4)}</span>
+                    <span class="stat-label">Highest TF-IDF</span>
+                </div>
+            </div>
+        </div>
+        <div class="table-container" style="margin-top: 1.5rem;">
             <table class="keyword-pages-table">
                 <thead>
                     <tr>
@@ -400,7 +430,7 @@ function showKeywordPages(keyword, data) {
                         <th>Keyword Count</th>
                         <th>TF-IDF</th>
                         <th>Keyword Ratio</th>
-                        <th>View</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -410,14 +440,16 @@ function showKeywordPages(keyword, data) {
         html += `
             <tr>
                 <td>
-                    <a href="${p.url}" target="_blank">${p.title || p.url}</a>
+                    <a href="${p.url}" target="_blank" title="${p.url}">${p.title || p.url}</a>
                 </td>
-                <td>${p.word_count || 0}</td>
-                <td>${p.keyword_count}</td>
+                <td>${(p.word_count || 0).toLocaleString()}</td>
+                <td><strong>${p.keyword_count}</strong></td>
                 <td>${p.tf_idf.toFixed(4)}</td>
-                <td>${(p.keyword_ratio * 100).toFixed(1)}%</td>
+                <td>${(p.keyword_ratio * 100).toFixed(2)}%</td>
                 <td>
-                    <button class="action-btn action-btn-view" data-url="${p.url}"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn action-btn-view" onclick="viewPageFromKeywordModal('${p.url.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-eye"></i> View
+                    </button>
                 </td>
             </tr>
         `;
@@ -429,17 +461,26 @@ function showKeywordPages(keyword, data) {
         </div>
     `;
 
-    container.innerHTML = html;
+    modalBody.innerHTML = html;
+    modal.style.display = 'block';
+}
 
-    // Wire up "View" buttons to open the existing page modal with full details
-    const buttons = container.querySelectorAll('button.action-btn-view');
-    buttons.forEach(btn => {
-        const url = btn.getAttribute('data-url');
-        const page = data.pages.find(p => p.url === url);
-        if (page) {
-            btn.onclick = () => showPageDetails(page);
-        }
-    });
+// View page details from keyword modal
+function viewPageFromKeywordModal(url) {
+    if (!window.crawlData || !window.crawlData.pages) return;
+    const page = window.crawlData.pages.find(p => p.url === url);
+    if (page) {
+        closeKeywordModal();
+        showPageDetails(page);
+    }
+}
+
+// Close keyword modal
+function closeKeywordModal() {
+    const modal = document.getElementById('keywordModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 // Advanced keyword search: user enters any keyword (single or multi-word phrase) and sees counts per page
@@ -1905,61 +1946,149 @@ function displayPerformanceAnalysis(data) {
         });
     }
     
-    // Display heavy images
+    // Update performance summary stats
+    const summary = document.getElementById('performanceSummary');
+    if (summary) {
+        const summaryHeavyImages = document.getElementById('summaryHeavyImages');
+        const summarySlowFiles = document.getElementById('summarySlowFiles');
+        const summarySlowSections = document.getElementById('summarySlowSections');
+        const summarySlowComponents = document.getElementById('summarySlowComponents');
+        const summaryRenderBlocking = document.getElementById('summaryRenderBlocking');
+        
+        if (summaryHeavyImages) summaryHeavyImages.textContent = allHeavyImages.length;
+        if (summarySlowFiles) summarySlowFiles.textContent = allSlowJsCss.length;
+        if (summarySlowSections) summarySlowSections.textContent = allSlowHtmlSections.length;
+        if (summarySlowComponents) summarySlowComponents.textContent = allSlowComponents.length;
+        if (summaryRenderBlocking) summaryRenderBlocking.textContent = allRenderBlocking.length;
+        
+        summary.style.display = 'grid';
+    }
+    
+    // Display heavy images with improved structure
     if (allHeavyImages.length === 0) {
-        heavyImagesContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No heavy images detected.</p></div>';
+        heavyImagesContainer.innerHTML = `
+            <div class="performance-empty">
+                <i class="fas fa-check-circle"></i>
+                <p>No heavy images detected. Great job! 🎉</p>
+            </div>
+        `;
     } else {
+        // Update column header with count
+        const heavyImagesHeader = document.querySelector('.performance-column:first-of-type h3');
+        if (heavyImagesHeader && !heavyImagesHeader.querySelector('.performance-column-count')) {
+            const countBadge = document.createElement('span');
+            countBadge.className = 'performance-column-count';
+            countBadge.textContent = allHeavyImages.length;
+            heavyImagesHeader.appendChild(countBadge);
+        }
+        
         let html = '<ul class="performance-list">';
         allHeavyImages.slice(0, 50).forEach(img => {
             const sizeDisplay = img.size_mb >= 1 ? `${img.size_mb.toFixed(2)} MB` : `${img.size_kb.toFixed(2)} KB`;
+            const sizeClass = img.size_mb >= 1 ? 'danger' : 'warning';
             html += `
-                <li class="performance-item">
+                <li class="performance-item ${sizeClass}">
                     <div class="performance-item-header">
-                        <strong>${sizeDisplay}</strong>
-                        <span class="badge badge-warning">Heavy</span>
+                        <strong>
+                            <i class="fas fa-image"></i>
+                            ${sizeDisplay}
+                        </strong>
+                        <span class="badge badge-${sizeClass}">Heavy Image</span>
                     </div>
                     <div class="performance-item-content">
-                        <div><strong>Image:</strong> <a href="${img.url}" target="_blank">${img.url.substring(0, 60)}${img.url.length > 60 ? '...' : ''}</a></div>
-                        <div><strong>Page:</strong> <a href="${img.page_url}" target="_blank">${img.page_title}</a></div>
-                        <div><strong>Location:</strong> ${img.location}</div>
-                        ${img.width && img.height ? `<div><strong>Dimensions:</strong> ${img.width}×${img.height}px</div>` : ''}
-                        <div><strong>Format:</strong> ${img.format}</div>
-                        <div class="performance-highlight" style="border: 2px solid #ffc107; padding: 5px; margin-top: 5px; background: #fff3cd;">
-                            <strong>HTML:</strong> <code>${img.html_snippet}</code>
+                        <div>
+                            <strong>Image URL:</strong>
+                            <a href="${img.url}" target="_blank" title="${img.url}">${img.url.length > 50 ? img.url.substring(0, 50) + '...' : img.url}</a>
                         </div>
+                        <div>
+                            <strong>Page:</strong>
+                            <a href="${img.page_url}" target="_blank">${img.page_title || img.page_url}</a>
+                        </div>
+                        <div>
+                            <strong>Location:</strong>
+                            <span class="performance-item-meta">${img.location || 'N/A'}</span>
+                        </div>
+                        ${img.width && img.height ? `
+                            <div>
+                                <strong>Dimensions:</strong>
+                                <span class="performance-item-meta">${img.width}×${img.height}px</span>
+                            </div>
+                        ` : ''}
+                        <div>
+                            <strong>Format:</strong>
+                            <span class="performance-item-meta">${img.format || 'Unknown'}</span>
+                        </div>
+                        ${img.html_snippet ? `
+                            <div class="performance-highlight">
+                                <code>${img.html_snippet}</code>
+                            </div>
+                        ` : ''}
                     </div>
                 </li>
             `;
         });
         if (allHeavyImages.length > 50) {
-            html += `<li><em>... and ${allHeavyImages.length - 50} more heavy images</em></li>`;
+            html += `<li style="text-align: center; padding: var(--space-md); color: var(--text-muted); font-style: italic;">
+                <i class="fas fa-info-circle"></i> Showing 50 of ${allHeavyImages.length} heavy images
+            </li>`;
         }
         html += '</ul>';
         heavyImagesContainer.innerHTML = html;
     }
     
-    // Display slow JS/CSS
+    // Display slow JS/CSS with improved structure
     if (allSlowJsCss.length === 0) {
-        slowJsCssContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No large JS/CSS files detected.</p></div>';
+        slowJsCssContainer.innerHTML = `
+            <div class="performance-empty">
+                <i class="fas fa-check-circle"></i>
+                <p>No large JS/CSS files detected. Excellent! ✨</p>
+            </div>
+        `;
     } else {
+        // Update column header with count
+        const jsCssHeader = document.querySelectorAll('.performance-column')[1]?.querySelector('h3');
+        if (jsCssHeader && !jsCssHeader.querySelector('.performance-column-count')) {
+            const countBadge = document.createElement('span');
+            countBadge.className = 'performance-column-count';
+            countBadge.textContent = allSlowJsCss.length;
+            jsCssHeader.appendChild(countBadge);
+        }
+        
         let html = '<ul class="performance-list">';
         allSlowJsCss.slice(0, 30).forEach(file => {
+            const fileIcon = file.type === 'JS' ? 'fa-file-code' : 'fa-file-alt';
             html += `
-                <li class="performance-item">
+                <li class="performance-item info">
                     <div class="performance-item-header">
-                        <strong>${file.size_kb.toFixed(2)} KB</strong>
+                        <strong>
+                            <i class="fas ${fileIcon}"></i>
+                            ${file.size_kb.toFixed(2)} KB
+                        </strong>
                         <span class="badge badge-info">${file.type}</span>
                     </div>
                     <div class="performance-item-content">
-                        <div><strong>File:</strong> <a href="${file.url}" target="_blank">${file.url.substring(0, 60)}${file.url.length > 60 ? '...' : ''}</a></div>
-                        <div><strong>Page:</strong> <a href="${file.page_url}" target="_blank">${file.page_title}</a></div>
-                        ${file.is_render_blocking ? '<div><span class="badge badge-danger">Render-Blocking</span></div>' : ''}
+                        <div>
+                            <strong>File URL:</strong>
+                            <a href="${file.url}" target="_blank" title="${file.url}">${file.url.length > 50 ? file.url.substring(0, 50) + '...' : file.url}</a>
+                        </div>
+                        <div>
+                            <strong>Page:</strong>
+                            <a href="${file.page_url}" target="_blank">${file.page_title || file.page_url}</a>
+                        </div>
+                        ${file.is_render_blocking ? `
+                            <div>
+                                <strong>Status:</strong>
+                                <span class="badge badge-danger">Render-Blocking</span>
+                            </div>
+                        ` : ''}
                     </div>
                 </li>
             `;
         });
         if (allSlowJsCss.length > 30) {
-            html += `<li><em>... and ${allSlowJsCss.length - 30} more files</em></li>`;
+            html += `<li style="text-align: center; padding: var(--space-md); color: var(--text-muted); font-style: italic;">
+                <i class="fas fa-info-circle"></i> Showing 30 of ${allSlowJsCss.length} files
+            </li>`;
         }
         html += '</ul>';
         slowJsCssContainer.innerHTML = html;
@@ -2028,26 +2157,63 @@ function displayPerformanceAnalysis(data) {
         slowComponentsContainer.innerHTML = html;
     }
     
-    // Display render-blocking resources
+    // Display render-blocking resources with improved structure
     if (allRenderBlocking.length === 0) {
-        renderBlockingContainer.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No render-blocking resources detected.</p></div>';
+        renderBlockingContainer.innerHTML = `
+            <div class="performance-empty">
+                <i class="fas fa-check-circle"></i>
+                <p>No render-blocking resources detected. Perfect! 🚀</p>
+            </div>
+        `;
     } else {
+        // Update column header with count
+        const renderBlockingHeader = document.querySelector('.performance-column.full-width h3');
+        if (renderBlockingHeader && !renderBlockingHeader.querySelector('.performance-column-count')) {
+            const countBadge = document.createElement('span');
+            countBadge.className = 'performance-column-count';
+            countBadge.textContent = allRenderBlocking.length;
+            renderBlockingHeader.appendChild(countBadge);
+        }
+        
         let html = '<ul class="performance-list">';
         allRenderBlocking.forEach(resource => {
             html += `
-                <li class="performance-item">
+                <li class="performance-item danger">
                     <div class="performance-item-header">
-                        <strong>${resource.type}</strong>
+                        <strong>
+                            <i class="fas fa-ban"></i>
+                            ${resource.type}
+                        </strong>
                         <span class="badge badge-danger">Render-Blocking</span>
                     </div>
                     <div class="performance-item-content">
-                        <div><strong>Resource:</strong> <a href="${resource.url}" target="_blank">${resource.url.substring(0, 60)}${resource.url.length > 60 ? '...' : ''}</a></div>
-                        <div><strong>Page:</strong> <a href="${resource.page_url}" target="_blank">${resource.page_title}</a></div>
-                        <div><strong>Size:</strong> ${resource.size_kb.toFixed(2)} KB</div>
-                        ${resource.has_async !== undefined ? `<div><strong>Async:</strong> ${resource.has_async ? 'Yes' : 'No'}</div>` : ''}
-                        ${resource.has_defer !== undefined ? `<div><strong>Defer:</strong> ${resource.has_defer ? 'Yes' : 'No'}</div>` : ''}
+                        <div>
+                            <strong>Resource URL:</strong>
+                            <a href="${resource.url}" target="_blank" title="${resource.url}">${resource.url.length > 50 ? resource.url.substring(0, 50) + '...' : resource.url}</a>
+                        </div>
+                        <div>
+                            <strong>Page:</strong>
+                            <a href="${resource.page_url}" target="_blank">${resource.page_title || resource.page_url}</a>
+                        </div>
+                        <div>
+                            <strong>Size:</strong>
+                            <span class="performance-item-meta">${resource.size_kb.toFixed(2)} KB</span>
+                        </div>
+                        ${resource.has_async !== undefined ? `
+                            <div>
+                                <strong>Async:</strong>
+                                <span class="performance-item-meta ${resource.has_async ? 'badge-success' : 'badge-danger'}">${resource.has_async ? 'Yes ✓' : 'No ✗'}</span>
+                            </div>
+                        ` : ''}
+                        ${resource.has_defer !== undefined ? `
+                            <div>
+                                <strong>Defer:</strong>
+                                <span class="performance-item-meta ${resource.has_defer ? 'badge-success' : 'badge-danger'}">${resource.has_defer ? 'Yes ✓' : 'No ✗'}</span>
+                            </div>
+                        ` : ''}
                         <div class="performance-suggestion">
-                            <strong>💡 Suggestion:</strong> Add <code>async</code> or <code>defer</code> attribute to prevent render-blocking.
+                            <strong><i class="fas fa-lightbulb"></i> Suggestion:</strong>
+                            Add <code>async</code> or <code>defer</code> attribute to prevent render-blocking.
                         </div>
                     </div>
                 </li>

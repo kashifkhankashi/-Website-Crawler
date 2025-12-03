@@ -6,6 +6,7 @@
     <title>Crawl Results - Website Crawler</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/results.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/enhancements.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
@@ -261,14 +262,41 @@
             <section id="performance-section" class="content-section">
                 <div class="card">
                     <div class="section-header">
-                        <h2><i class="fas fa-tachometer-alt"></i> Performance Analysis</h2>
-                        <p class="section-description">Detect slow-loading elements and performance bottlenecks</p>
+                        <div>
+                            <h2><i class="fas fa-tachometer-alt"></i> Performance Analysis</h2>
+                            <p class="section-description">Detect slow-loading elements and performance bottlenecks</p>
+                        </div>
+                        <div class="section-actions">
+                            <select id="performancePageFilter" class="filter-select">
+                                <option value="all">All Pages</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="section-actions">
-                        <select id="performancePageFilter" class="filter-select">
-                            <option value="all">All Pages</option>
-                        </select>
+                    
+                    <!-- Performance Summary Stats -->
+                    <div class="performance-summary" id="performanceSummary" style="display: none;">
+                        <div class="performance-summary-item">
+                            <span class="summary-value" id="summaryHeavyImages">0</span>
+                            <span class="summary-label">Heavy Images</span>
+                        </div>
+                        <div class="performance-summary-item">
+                            <span class="summary-value" id="summarySlowFiles">0</span>
+                            <span class="summary-label">Slow JS/CSS</span>
+                        </div>
+                        <div class="performance-summary-item">
+                            <span class="summary-value" id="summarySlowSections">0</span>
+                            <span class="summary-label">Slow Sections</span>
+                        </div>
+                        <div class="performance-summary-item">
+                            <span class="summary-value" id="summarySlowComponents">0</span>
+                            <span class="summary-label">Slow Components</span>
+                        </div>
+                        <div class="performance-summary-item">
+                            <span class="summary-value" id="summaryRenderBlocking">0</span>
+                            <span class="summary-label">Render-Blocking</span>
+                        </div>
                     </div>
+                    
                     <div class="performance-grid">
                         <div class="performance-column">
                             <h3><i class="fas fa-image"></i> Heavy Images</h3>
@@ -394,16 +422,16 @@
                                     <th>Pages Using It</th>
                                     <th>Total Count</th>
                                     <th>IDF</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="keywordsTableBody">
                                 <tr>
-                                    <td colspan="4" class="loading">Loading keyword analysis...</td>
+                                    <td colspan="5" class="loading">Loading keyword analysis...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <div id="keywordPageDetails" class="keyword-page-details"></div>
                 </div>
             </section>
 
@@ -515,8 +543,46 @@
         </div>
     </div>
 
+    <!-- Keyword Details Modal -->
+    <div id="keywordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="keywordModalTitle"><i class="fas fa-key"></i> Keyword Details</h2>
+                <span class="close" onclick="closeKeywordModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="keywordModalBody">
+                <!-- Keyword details will be displayed here -->
+            </div>
+        </div>
+    </div>
+
     <script>
         const jobId = '{{ job_id }}';
+        
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const keywordModal = document.getElementById('keywordModal');
+            const pageModal = document.getElementById('pageModal');
+            const similarContentModal = document.getElementById('similarContentModal');
+            
+            if (keywordModal && event.target === keywordModal) {
+                closeKeywordModal();
+            }
+            if (pageModal && event.target === pageModal) {
+                if (typeof closeModal === 'function') {
+                    closeModal();
+                } else {
+                    pageModal.style.display = 'none';
+                }
+            }
+            if (similarContentModal && event.target === similarContentModal) {
+                if (typeof closeSimilarContentModal === 'function') {
+                    closeSimilarContentModal();
+                } else {
+                    similarContentModal.style.display = 'none';
+                }
+            }
+        };
     </script>
     <script src="{{ url_for('static', filename='js/results.js') }}"></script>
 </body>
