@@ -13,6 +13,34 @@
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 </head>
 <body>
+    <!-- Top Navigation Bar - Always Visible -->
+    <nav class="top-navbar" id="topNavbar" style="display: block;">
+        <div class="navbar-container">
+            <div class="navbar-brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fas fa-spider"></i>
+                <span>Website Analyzer</span>
+            </div>
+            <div class="navbar-menu">
+                <button class="nav-item" onclick="window.location.href='/'" id="nav-start-crawl">
+                    <i class="fas fa-play-circle"></i>
+                    <span>Start New Crawl</span>
+                </button>
+                <button class="nav-item" onclick="window.location.href='/#competitor'" id="nav-competitor">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Competitor Analyzer</span>
+                </button>
+                <button class="nav-item" onclick="window.location.href='/#keyword'" id="nav-keyword">
+                    <i class="fas fa-key"></i>
+                    <span>Keyword Research</span>
+                </button>
+                <button class="nav-item" onclick="window.location.href='/#history'" id="nav-history">
+                    <i class="fas fa-history"></i>
+                    <span>View History</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <header class="results-header">
             <div class="header-content">

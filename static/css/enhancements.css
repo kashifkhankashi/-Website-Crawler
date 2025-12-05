@@ -150,11 +150,11 @@ table tbody tr:last-child td {
 
 /* Comparison Sections */
 .comparison-section {
-    margin-bottom: var(--space-2xl);
-    padding: var(--space-xl);
+    margin-bottom: var(--space-lg);
+    padding: var(--space-md);
     background: var(--bg-primary);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
 }
 
