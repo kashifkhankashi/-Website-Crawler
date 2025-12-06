@@ -42,6 +42,9 @@ function showLoginModal() {
     const competitorCard = document.getElementById('competitorCard');
     const topNavbar = document.getElementById('topNavbar');
     
+    // Only hide navbar if we're on the index page (not results page)
+    const isResultsPage = window.location.pathname.includes('/results/');
+    
     if (loginModal) {
         loginModal.style.display = 'flex';
     }
@@ -51,7 +54,8 @@ function showLoginModal() {
     if (competitorCard) {
         competitorCard.style.display = 'none';
     }
-    if (topNavbar) {
+    // Only hide navbar on index page when showing login, keep it visible on results page
+    if (topNavbar && !isResultsPage) {
         topNavbar.style.display = 'none';
     }
 }

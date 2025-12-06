@@ -9,7 +9,7 @@
 </head>
 <body>
     <!-- Top Navigation Bar -->
-    <nav class="top-navbar" id="topNavbar" style="display: none;">
+    <nav class="top-navbar" id="topNavbar">
         <div class="navbar-container">
             <div class="navbar-brand">
                 <i class="fas fa-spider"></i>
@@ -36,56 +36,14 @@
         </div>
     </nav>
 
-    <!-- Top Progress Bar - Sticky at Top -->
-    <div class="top-progress-bar" id="topProgressBar" style="display: none;">
-        <div class="top-progress-container">
-            <div class="top-progress-header">
-                <div class="top-progress-title">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span id="topProgressMessageText">Crawling in Progress...</span>
-                </div>
-                <div class="top-progress-percentage">
-                    <span id="topProgressText">0%</span>
-                </div>
-            </div>
-            <div class="top-progress-bar-wrapper">
-                <div class="top-progress-fill" id="topProgressFill" style="width: 0%"></div>
-            </div>
-            <div class="top-progress-stats" id="topProgressStats" style="display: none;">
-                <div class="top-stat-item">
-                    <i class="fas fa-file-alt"></i>
-                    <span><strong id="topPagesCount">0</strong> Pages</span>
-                    <small id="topDiscoveredInfo" style="display: none;">of <strong id="topDiscoveredCount">0</strong></small>
-                </div>
-                <div class="top-stat-item">
-                    <i class="fas fa-link"></i>
-                    <span><strong id="topLinksCount">0</strong> Links</span>
-                </div>
-                <div class="top-stat-item">
-                    <i class="fas fa-tachometer-alt"></i>
-                    <span><strong id="topPagesPerSecond">0</strong>/sec</span>
-                </div>
-                <div class="top-stat-item">
-                    <i class="fas fa-clock"></i>
-                    <span id="topElapsedTime">0s</span>
-                </div>
-                <div class="top-stat-item">
-                    <i class="fas fa-hourglass-half"></i>
-                    <span id="topEstimatedTime">Calculating...</span>
-                </div>
-            </div>
-            <div class="top-progress-current-page" id="topCurrentPageInfo" style="display: none;">
-                <i class="fas fa-globe"></i>
-                <span id="topCurrentPageText">Loading...</span>
-            </div>
-        </div>
-    </div>
-
     <!-- Login Modal -->
     <div id="loginModal" class="login-modal">
         <div class="login-modal-content">
             <div class="login-header">
-                <h2><i class="fas fa-lock"></i> Login Required</h2>
+                <div class="login-icon-wrapper">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <h2>Login Required</h2>
                 <p>Please enter your credentials to access the website crawler</p>
             </div>
             <form id="loginForm">
@@ -97,7 +55,7 @@
                         type="text" 
                         id="username" 
                         name="username" 
-                        placeholder="Enter username" 
+                        placeholder="Enter your username" 
                         required
                         autocomplete="username"
                     >
@@ -110,14 +68,14 @@
                         type="password" 
                         id="password" 
                         name="password" 
-                        placeholder="Enter password" 
+                        placeholder="Enter your password" 
                         required
                         autocomplete="current-password"
                     >
                 </div>
                 <div id="loginError" class="error-message" style="display: none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">
-                    <i class="fas fa-sign-in-alt"></i> Login
+                    <i class="fas fa-sign-in-alt"></i> Sign In
                 </button>
             </form>
         </div>
@@ -188,10 +146,10 @@
                 <div class="keyword-tabs-container">
                     <div class="keyword-tabs">
                         <button class="keyword-tab active" onclick="switchKeywordTab('research')" id="tab-research">
-                            <i class="fas fa-chart-line"></i> Discover Keywords
+                            <i class="fas fa-chart-line"></i> Keyword Research
                         </button>
                         <button class="keyword-tab" onclick="switchKeywordTab('search')" id="tab-search">
-                            <i class="fas fa-search"></i> Search Keywords
+                            <i class="fas fa-search"></i> Search Keyword
                         </button>
                     </div>
                 </div>
@@ -407,14 +365,113 @@
             <p class="subtitle">Crawl websites, detect duplicates, and find broken links</p>
         </header>
 
+        <!-- Progress Section -->
+        <div class="card" id="progressCard" style="display: none;">
+            <h2>Crawl Progress</h2>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+            <div class="progress-info">
+                <p id="progressMessage">
+                    <i class="fas fa-spinner fa-spin" id="loadingIcon" style="margin-right: 8px;"></i>
+                    <span id="progressMessageText">Initializing...</span>
+                </p>
+                <div class="stats" id="stats" style="display: none;">
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Pages: <strong id="pagesCount">0</strong></span>
+                            <small id="discoveredPagesInfo" style="display: none;">of <strong id="discoveredPagesCount">0</strong> discovered</small>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-link"></i>
+                            <span>Total Links: <strong id="linksCount">0</strong></span>
+                        </div>
+                        <div class="stat-item" id="internalLinksItem" style="display: none;">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>Internal: <strong id="internalLinksCount">0</strong></span>
+                        </div>
+                        <div class="stat-item" id="externalLinksItem" style="display: none;">
+                            <i class="fas fa-external-link-alt"></i>
+                            <span>External: <strong id="externalLinksCount">0</strong></span>
+                        </div>
+                    </div>
+                    <div class="stats-row stats-row-secondary">
+                        <div class="stat-item">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Speed: <strong id="pagesPerSecond">0</strong> pages/sec</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-link"></i>
+                            <span>Avg Links/Page: <strong id="avgLinksPerPage">0</strong></span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-clock"></i>
+                            <span>Elapsed: <strong id="elapsedTime">0s</strong></span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-hourglass-half"></i>
+                            <span>Est. Remaining: <strong id="estimatedTimeRemaining">Calculating...</strong></span>
+                        </div>
+                    </div>
+                </div>
+                <div id="currentPageInfo" class="current-page-info" style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span id="currentPageText">Crawling...</span>
+                </div>
+            </div>
+            <div id="errorContainer" class="error-container" style="display: none;"></div>
+            <!-- Completion Section with View Results Button -->
+            <div id="progressCompletionSection" style="display: none;">
+                <div class="completion-message">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Crawl Completed Successfully!</h3>
+                    <p>Your website crawl has finished. Click below to view the detailed results.</p>
+                </div>
+                <div class="completion-actions">
+                    <a href="#" id="viewResultsBtnProgress" class="btn btn-success btn-large">
+                        <i class="fas fa-eye"></i> View Results
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <main>
             <!-- Crawl History Section -->
             <div class="card" id="historyCard" style="display: none;">
                 <div class="section-header">
-                    <h2><i class="fas fa-history"></i> Crawl History</h2>
+                    <div>
+                        <h2><i class="fas fa-history"></i> Crawl History</h2>
+                        <p class="section-description">View and manage your previous website crawls</p>
+                    </div>
+                </div>
+                <div class="history-controls">
+                    <div class="history-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input 
+                            type="text" 
+                            id="historySearch" 
+                            placeholder="Search by URL..." 
+                            class="history-search-input"
+                        >
+                    </div>
+                    <div class="history-sort-wrapper">
+                        <select id="historySort" class="history-sort-select">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="pages">Most Pages</option>
+                            <option value="links">Most Links</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="historyContainer">
-                    <p class="loading">Loading crawl history...</p>
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading crawl history...</p>
+                    </div>
                 </div>
             </div>
 
@@ -470,67 +527,6 @@
                         <i class="fas fa-play"></i> Start Crawling
                     </button>
                 </form>
-            </div>
-
-            <!-- Progress Section -->
-            <div class="card" id="progressCard" style="display: none;">
-                <h2>Crawl Progress</h2>
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                    </div>
-                    <div class="progress-text" id="progressText">0%</div>
-                </div>
-                <div class="progress-info">
-                    <p id="progressMessage">
-                        <i class="fas fa-spinner fa-spin" id="loadingIcon" style="margin-right: 8px;"></i>
-                        <span id="progressMessageText">Initializing...</span>
-                    </p>
-                    <div class="stats" id="stats" style="display: none;">
-                        <div class="stats-row">
-                            <div class="stat-item">
-                                <i class="fas fa-file-alt"></i>
-                                <span>Pages: <strong id="pagesCount">0</strong></span>
-                                <small id="discoveredPagesInfo" style="display: none;">of <strong id="discoveredPagesCount">0</strong> discovered</small>
-                            </div>
-                            <div class="stat-item">
-                                <i class="fas fa-link"></i>
-                                <span>Total Links: <strong id="linksCount">0</strong></span>
-                            </div>
-                            <div class="stat-item" id="internalLinksItem" style="display: none;">
-                                <i class="fas fa-arrow-right"></i>
-                                <span>Internal: <strong id="internalLinksCount">0</strong></span>
-                            </div>
-                            <div class="stat-item" id="externalLinksItem" style="display: none;">
-                                <i class="fas fa-external-link-alt"></i>
-                                <span>External: <strong id="externalLinksCount">0</strong></span>
-                            </div>
-                        </div>
-                        <div class="stats-row stats-row-secondary">
-                            <div class="stat-item">
-                                <i class="fas fa-tachometer-alt"></i>
-                                <span>Speed: <strong id="pagesPerSecond">0</strong> pages/sec</span>
-                            </div>
-                            <div class="stat-item">
-                                <i class="fas fa-link"></i>
-                                <span>Avg Links/Page: <strong id="avgLinksPerPage">0</strong></span>
-                            </div>
-                            <div class="stat-item">
-                                <i class="fas fa-clock"></i>
-                                <span>Elapsed: <strong id="elapsedTime">0s</strong></span>
-                            </div>
-                            <div class="stat-item">
-                                <i class="fas fa-hourglass-half"></i>
-                                <span>Est. Remaining: <strong id="estimatedTimeRemaining">Calculating...</strong></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="currentPageInfo" class="current-page-info" style="display: none;">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span id="currentPageText">Crawling...</span>
-                    </div>
-                </div>
-                <div id="errorContainer" class="error-container" style="display: none;"></div>
             </div>
 
             <!-- Results Section -->

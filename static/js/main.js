@@ -36,11 +36,17 @@ async function showHistory() {
     const competitorCard = document.getElementById('competitorCard');
     const keywordCard = document.getElementById('keywordResearchCard');
     const startNewCrawlCard = document.getElementById('startNewCrawlCard');
+    const progressCard = document.getElementById('progressCard');
+    const resultsCard = document.getElementById('resultsCard');
+    const progressCompletionSection = document.getElementById('progressCompletionSection');
     
     // Hide other sections
     if (competitorCard) competitorCard.style.display = 'none';
     if (keywordCard) keywordCard.style.display = 'none';
     if (startNewCrawlCard) startNewCrawlCard.style.display = 'none';
+    if (progressCard) progressCard.style.display = 'none';
+    if (resultsCard) resultsCard.style.display = 'none';
+    if (progressCompletionSection) progressCompletionSection.style.display = 'none';
     
     // Show main content and history
     if (mainContent) {
@@ -50,7 +56,7 @@ async function showHistory() {
     if (!historyCard || !historyContainer) return;
     
     historyCard.style.display = 'block';
-    historyContainer.innerHTML = '<p class="loading">Loading crawl history...</p>';
+    historyContainer.innerHTML = '<div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>Loading crawl history...</p></div>';
     
     // Update active nav item
     updateActiveNavItem('nav-history');
@@ -60,45 +66,156 @@ async function showHistory() {
         const data = await response.json();
         
         if (!data.jobs || data.jobs.length === 0) {
-            historyContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No crawl history found. Start your first crawl!</p>';
+            historyContainer.innerHTML = `
+                <div class="history-empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <h3>No Crawl History</h3>
+                    <p>You haven't run any crawls yet. Start your first crawl to see results here!</p>
+                    <button class="btn btn-primary" onclick="showMainContentNav()">
+                        <i class="fas fa-play"></i> Start Your First Crawl
+                    </button>
+                </div>
+            `;
             return;
         }
         
-        let html = '<div class="history-list">';
-        data.jobs.forEach(job => {
-            const date = new Date(job.started_at || job.completed_at || Date.now());
-            const dateStr = date.toLocaleString();
-            const statusBadge = job.status === 'completed' 
-                ? '<span class="badge badge-success">Completed</span>'
-                : job.status === 'crawling'
-                ? '<span class="badge badge-info">Crawling</span>'
-                : '<span class="badge badge-warning">' + job.status + '</span>';
-            
-            html += `
-                <div class="history-item" onclick="viewHistoryJob('${job.job_id}')">
-                    <div class="history-item-header">
-                        <div class="history-item-title">
-                            <strong>${job.url || 'Unknown URL'}</strong>
-                            ${statusBadge}
-                        </div>
-                        <div class="history-item-meta">
-                            <span><i class="fas fa-calendar"></i> ${dateStr}</span>
-                        </div>
-                    </div>
-                    <div class="history-item-stats">
-                        <span><i class="fas fa-file-alt"></i> ${job.pages_crawled || 0} pages</span>
-                        <span><i class="fas fa-link"></i> ${job.links_found || 0} links</span>
-                        ${job.site_seo_score !== null ? `<span><i class="fas fa-star"></i> SEO: ${job.site_seo_score}/100</span>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        historyContainer.innerHTML = html;
+        // Store jobs for filtering/sorting
+        window.historyJobs = data.jobs;
+        
+        renderHistoryList(data.jobs);
+        
+        // Add event listeners for search and sort
+        const searchInput = document.getElementById('historySearch');
+        const sortSelect = document.getElementById('historySort');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                filterAndSortHistory(e.target.value, sortSelect.value);
+            });
+        }
+        
+        if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+                filterAndSortHistory(searchInput ? searchInput.value : '', e.target.value);
+            });
+        }
     } catch (error) {
         console.error('Error loading history:', error);
-        historyContainer.innerHTML = '<p class="error">Error loading crawl history. Please try again.</p>';
+        historyContainer.innerHTML = '<p class="error-message">Error loading history. Please try again.</p>';
     }
+}
+
+function renderHistoryList(jobs) {
+    const historyContainer = document.getElementById('historyContainer');
+    if (!historyContainer) return;
+    
+    if (!jobs || jobs.length === 0) {
+        historyContainer.innerHTML = `
+            <div class="history-empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-history"></i>
+                </div>
+                <h3>No Crawl History</h3>
+                <p>You haven't run any crawls yet. Start your first crawl to see results here!</p>
+                <button class="btn btn-primary" onclick="showMainContentNav()">
+                    <i class="fas fa-play"></i> Start Your First Crawl
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="history-list">';
+    jobs.forEach((job) => {
+        const date = new Date(job.started_at || job.completed_at || Date.now());
+        const dateStr = date.toLocaleString();
+        const timeAgo = getTimeAgo(date);
+        
+        // Clean and truncate URL for display
+        let displayUrl = job.url || 'Unknown URL';
+        let cleanUrl = displayUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        if (cleanUrl.length > 50) {
+            cleanUrl = cleanUrl.substring(0, 47) + '...';
+        }
+        
+        let statusBadge = '';
+        if (job.status === 'completed') {
+            statusBadge = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Completed</span>';
+        } else if (job.status === 'crawling') {
+            statusBadge = '<span class="badge badge-info"><i class="fas fa-spinner fa-spin"></i> Crawling</span>';
+        } else {
+            statusBadge = `<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> ${job.status}</span>`;
+        }
+        
+        html += `
+            <div class="history-item" data-url="${(job.url || '').toLowerCase()}" data-pages="${job.pages_crawled || 0}" data-links="${job.links_found || 0}" data-date="${date.getTime()}">
+                <div class="history-url-icon">
+                    <i class="fas fa-globe"></i>
+                </div>
+                <div class="history-url-text" title="${job.url || 'Unknown URL'}">${cleanUrl}</div>
+                <div class="history-item-meta">
+                    <i class="fas fa-clock"></i>
+                    <span>${timeAgo}</span>
+                    ${statusBadge}
+                </div>
+                <div class="history-item-stats-compact">
+                    <div class="stat-badge" title="Pages crawled">
+                        <i class="fas fa-file-alt"></i>
+                        <span>${job.pages_crawled || 0}</span>
+                    </div>
+                    <div class="stat-badge" title="Links found">
+                        <i class="fas fa-link"></i>
+                        <span>${job.links_found || 0}</span>
+                    </div>
+                    ${job.site_seo_score !== null && job.site_seo_score !== undefined ? `<div class="stat-badge seo-badge" title="SEO Score"><i class="fas fa-star"></i><span>${job.site_seo_score}</span></div>` : ''}
+                </div>
+                <div class="history-item-actions">
+                    <button class="btn btn-primary btn-sm" onclick="viewHistoryJob('${job.job_id}')">
+                        <i class="fas fa-eye"></i> View Results
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    historyContainer.innerHTML = html;
+}
+
+function filterAndSortHistory(searchTerm, sortBy) {
+    if (!window.historyJobs) return;
+    
+    let filtered = [...window.historyJobs];
+    
+    // Filter by search term
+    if (searchTerm && searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        filtered = filtered.filter(job => 
+            (job.url || '').toLowerCase().includes(term)
+        );
+    }
+    
+    // Sort
+    filtered.sort((a, b) => {
+        const dateA = new Date(a.started_at || a.completed_at || 0).getTime();
+        const dateB = new Date(b.started_at || b.completed_at || 0).getTime();
+        
+        switch(sortBy) {
+            case 'newest':
+                return dateB - dateA;
+            case 'oldest':
+                return dateA - dateB;
+            case 'pages':
+                return (b.pages_crawled || 0) - (a.pages_crawled || 0);
+            case 'links':
+                return (b.links_found || 0) - (a.links_found || 0);
+            default:
+                return dateB - dateA;
+        }
+    });
+    
+    renderHistoryList(filtered);
 }
 
 // Hide crawl history
@@ -114,6 +231,26 @@ function viewHistoryJob(jobId) {
     window.location.href = `/results/${jobId}`;
 }
 
+// Helper function to get time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+        return days === 1 ? '1 day ago' : `${days} days ago`;
+    } else if (hours > 0) {
+        return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+    } else if (minutes > 0) {
+        return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+    } else {
+        return 'Just now';
+    }
+}
+
 // Show competitor analyzer
 function showCompetitorAnalyzer() {
     const competitorCard = document.getElementById('competitorCard');
@@ -121,12 +258,18 @@ function showCompetitorAnalyzer() {
     const keywordCard = document.getElementById('keywordResearchCard');
     const historyCard = document.getElementById('historyCard');
     const loginCard = document.getElementById('loginCard');
+    const progressCard = document.getElementById('progressCard');
+    const resultsCard = document.getElementById('resultsCard');
+    const progressCompletionSection = document.getElementById('progressCompletionSection');
     
     // Hide other sections
     if (mainContent) mainContent.style.display = 'none';
     if (keywordCard) keywordCard.style.display = 'none';
     if (historyCard) historyCard.style.display = 'none';
     if (loginCard) loginCard.style.display = 'none';
+    if (progressCard) progressCard.style.display = 'none';
+    if (resultsCard) resultsCard.style.display = 'none';
+    if (progressCompletionSection) progressCompletionSection.style.display = 'none';
     
     // Show competitor analyzer
     if (competitorCard) {
@@ -165,12 +308,18 @@ function showKeywordResearch() {
     const competitorCard = document.getElementById('competitorCard');
     const historyCard = document.getElementById('historyCard');
     const loginCard = document.getElementById('loginCard');
+    const progressCard = document.getElementById('progressCard');
+    const resultsCard = document.getElementById('resultsCard');
+    const progressCompletionSection = document.getElementById('progressCompletionSection');
     
     // Hide other sections
     if (mainContent) mainContent.style.display = 'none';
     if (competitorCard) competitorCard.style.display = 'none';
     if (historyCard) historyCard.style.display = 'none';
     if (loginCard) loginCard.style.display = 'none';
+    if (progressCard) progressCard.style.display = 'none';
+    if (resultsCard) resultsCard.style.display = 'none';
+    if (progressCompletionSection) progressCompletionSection.style.display = 'none';
     
     // Show keyword research
     if (keywordCard) {
@@ -221,11 +370,17 @@ function showMainContentNav() {
     const keywordCard = document.getElementById('keywordResearchCard');
     const historyCard = document.getElementById('historyCard');
     const startNewCrawlCard = document.getElementById('startNewCrawlCard');
+    const progressCard = document.getElementById('progressCard');
+    const resultsCard = document.getElementById('resultsCard');
+    const progressCompletionSection = document.getElementById('progressCompletionSection');
     
     // Hide other sections
     if (competitorCard) competitorCard.style.display = 'none';
     if (keywordCard) keywordCard.style.display = 'none';
     if (historyCard) historyCard.style.display = 'none';
+    if (progressCard) progressCard.style.display = 'none';
+    if (resultsCard) resultsCard.style.display = 'none';
+    if (progressCompletionSection) progressCompletionSection.style.display = 'none';
     
     // Show main content and Start New Crawl card
     if (mainContent) {
@@ -2774,11 +2929,10 @@ async function handleFormSubmit(e) {
 
 // Show progress card
 function showProgressCard() {
-    // Show top progress bar
-    const topProgressBar = document.getElementById('topProgressBar');
-    if (topProgressBar) {
-        topProgressBar.style.display = 'block';
-        document.body.classList.add('progress-bar-active');
+    // Hide completion section when starting new crawl
+    const completionSection = document.getElementById('progressCompletionSection');
+    if (completionSection) {
+        completionSection.style.display = 'none';
     }
     
     document.getElementById('progressCard').style.display = 'block';
@@ -2786,15 +2940,7 @@ function showProgressCard() {
     document.getElementById('progressFill').style.width = '0%';
     document.getElementById('progressText').textContent = '0%';
     
-    // Initialize top progress bar
-    if (topProgressBar) {
-        const topProgressFill = document.getElementById('topProgressFill');
-        const topProgressText = document.getElementById('topProgressText');
-        const topProgressMessageText = document.getElementById('topProgressMessageText');
-        if (topProgressFill) topProgressFill.style.width = '0%';
-        if (topProgressText) topProgressText.textContent = '0%';
-        if (topProgressMessageText) topProgressMessageText.textContent = 'Crawling in Progress...';
-    }
+    // Top progress bar removed - no longer needed
     
     const progressMessageText = document.getElementById('progressMessageText');
     const loadingIcon = document.getElementById('loadingIcon');
@@ -2818,26 +2964,7 @@ function updateProgress(data) {
     if (progressFill) progressFill.style.width = progress + '%';
     if (progressText) progressText.textContent = progress + '%';
     
-    // Update top progress bar
-    const topProgressBar = document.getElementById('topProgressBar');
-    const topProgressFill = document.getElementById('topProgressFill');
-    const topProgressText = document.getElementById('topProgressText');
-    const topProgressMessageText = document.getElementById('topProgressMessageText');
-    const topProgressStats = document.getElementById('topProgressStats');
-    
-    if (topProgressBar && topProgressFill && topProgressText) {
-        topProgressFill.style.width = progress + '%';
-        topProgressText.textContent = progress + '%';
-        
-        if (topProgressMessageText && data.message) {
-            // Extract just the status part from message
-            let statusMsg = data.message;
-            if (statusMsg.includes('Found')) {
-                statusMsg = statusMsg.split('Found')[0] + 'Found' + statusMsg.split('Found')[1].split(',')[0];
-            }
-            topProgressMessageText.textContent = statusMsg || 'Crawling in Progress...';
-        }
-    }
+    // Top progress bar removed - no longer needed
     
     // Update message
     if (data.message) {
@@ -2920,44 +3047,7 @@ function updateProgress(data) {
             }
         }
         
-        // Update top progress bar stats
-        if (topProgressStats) {
-            topProgressStats.style.display = 'flex';
-            
-            if (data.pages_crawled !== undefined) {
-                const topPagesCount = document.getElementById('topPagesCount');
-                if (topPagesCount) topPagesCount.textContent = data.pages_crawled;
-            }
-            
-            if (data.links_found !== undefined) {
-                const topLinksCount = document.getElementById('topLinksCount');
-                if (topLinksCount) topLinksCount.textContent = data.links_found;
-            }
-            
-            if (data.discovered_urls !== undefined && data.discovered_urls > 0) {
-                const topDiscoveredInfo = document.getElementById('topDiscoveredInfo');
-                const topDiscoveredCount = document.getElementById('topDiscoveredCount');
-                if (topDiscoveredInfo && topDiscoveredCount) {
-                    topDiscoveredInfo.style.display = 'inline';
-                    topDiscoveredCount.textContent = data.discovered_urls;
-                }
-            }
-            
-            if (data.pages_per_second !== undefined) {
-                const topPagesPerSecond = document.getElementById('topPagesPerSecond');
-                if (topPagesPerSecond) topPagesPerSecond.textContent = data.pages_per_second.toFixed(2);
-            }
-            
-            if (data.elapsed_time !== undefined) {
-                const topElapsedTime = document.getElementById('topElapsedTime');
-                if (topElapsedTime) topElapsedTime.textContent = data.elapsed_time;
-            }
-            
-            if (data.estimated_time_remaining !== undefined) {
-                const topEstimatedTime = document.getElementById('topEstimatedTime');
-                if (topEstimatedTime) topEstimatedTime.textContent = data.estimated_time_remaining;
-            }
-        }
+        // Top progress bar stats removed - no longer needed
     }
     
     // Update current page info
@@ -2971,17 +3061,6 @@ function updateProgress(data) {
                 : data.current_page;
             currentPageText.textContent = `Current: ${pageDisplay}`;
         }
-        
-        // Update top progress current page
-        const topCurrentPageInfo = document.getElementById('topCurrentPageInfo');
-        const topCurrentPageText = document.getElementById('topCurrentPageText');
-        if (topCurrentPageInfo && topCurrentPageText) {
-            topCurrentPageInfo.style.display = 'block';
-            const pageDisplay = data.current_page.length > 80 
-                ? data.current_page.substring(0, 80) + '...' 
-                : data.current_page;
-            topCurrentPageText.textContent = pageDisplay;
-        }
     }
     
     // Handle errors
@@ -2990,11 +3069,7 @@ function updateProgress(data) {
         errorContainer.innerHTML = '<strong>Error:</strong> ' + data.message;
         if (loadingIcon) loadingIcon.style.display = 'none';
         
-        // Hide top progress bar on error
-        if (topProgressBar) {
-            topProgressBar.style.display = 'none';
-            document.body.classList.remove('progress-bar-active');
-        }
+        // Top progress bar removed - no longer needed
     } else {
         errorContainer.style.display = 'none';
     }
@@ -3003,22 +3078,28 @@ function updateProgress(data) {
     if (data.status === 'completed') {
         if (loadingIcon) loadingIcon.style.display = 'none';
         
-        // Update top progress bar to 100%
-        if (topProgressBar && topProgressFill && topProgressText) {
-            topProgressFill.style.width = '100%';
-            topProgressText.textContent = '100%';
-            if (topProgressMessageText) {
-                topProgressMessageText.textContent = 'Crawl Completed!';
-            }
+        // Update progress to 100%
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        if (progressFill) progressFill.style.width = '100%';
+        if (progressText) progressText.textContent = '100%';
+        
+        // Update progress message
+        const progressMessageText = document.getElementById('progressMessageText');
+        if (progressMessageText) {
+            progressMessageText.textContent = 'Crawl Completed!';
         }
         
-        // Hide top progress bar after a delay
-        setTimeout(() => {
-            if (topProgressBar) {
-                topProgressBar.style.display = 'none';
-                document.body.classList.remove('progress-bar-active');
+        // Show completion section with View Results button
+        const completionSection = document.getElementById('progressCompletionSection');
+        if (completionSection) {
+            completionSection.style.display = 'block';
+            // Link the button to results page
+            const viewResultsBtnProgress = document.getElementById('viewResultsBtnProgress');
+            if (viewResultsBtnProgress && data.job_id) {
+                viewResultsBtnProgress.href = `/results/${data.job_id}`;
             }
-        }, 2000);
+        }
         
         // Reset button state
         const startBtn = document.getElementById('startBtn');
@@ -3027,6 +3108,7 @@ function updateProgress(data) {
             startBtn.innerHTML = '<i class="fas fa-play"></i> Start Crawling';
         }
         
+        // Also show the results card below (for download buttons)
         setTimeout(() => {
             showResultsCard(data.job_id);
         }, 1000);
@@ -3044,14 +3126,8 @@ function updateProgress(data) {
 
 // Show results card
 function showResultsCard(jobId) {
-    // Hide top progress bar
-    const topProgressBar = document.getElementById('topProgressBar');
-    if (topProgressBar) {
-        topProgressBar.style.display = 'none';
-        document.body.classList.remove('progress-bar-active');
-    }
-    
-    document.getElementById('progressCard').style.display = 'none';
+    // Keep progress card visible (don't hide it) so the View Results button stays visible
+    // Just show the results card below for download options
     document.getElementById('resultsCard').style.display = 'block';
     
     // Set up download buttons
