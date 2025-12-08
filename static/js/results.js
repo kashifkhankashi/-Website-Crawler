@@ -163,6 +163,7 @@ function displayAllSections(data) {
     
     try {
         displayAdvancedSEO(data);
+        displaySkippedPages(data);
     } catch (e) {
         console.error('Error displaying advanced SEO:', e);
     }
@@ -1145,10 +1146,19 @@ function displaySimilarity(data) {
     });
 }
 
-// Display external links section
+// Display external links section (ENHANCED with deep analysis)
 function displayExternalLinks(data) {
     const container = document.getElementById('externalLinksContainer');
+    const summaryContainer = document.getElementById('externalLinksSummary');
     const allExternalLinks = [];
+    
+    // Get analyzed external links if available
+    const analyzedLinksMap = {};
+    if (data.external_links_analysis && data.external_links_analysis.analyzed_links) {
+        data.external_links_analysis.analyzed_links.forEach(analyzed => {
+            analyzedLinksMap[analyzed.url] = analyzed;
+        });
+    }
     
     // Extract external links with location data
     if (data.pages) {
@@ -1156,7 +1166,7 @@ function displayExternalLinks(data) {
             if (page.external_links && page.external_links.length > 0) {
                 page.external_links.forEach(linkData => {
                     // Handle both string URLs and dict objects with location data
-                    let linkUrl, anchorText, locationInfo, cssSelector, context;
+                    let linkUrl, anchorText, locationInfo, cssSelector, context, rel, target;
                     
                     if (typeof linkData === 'string') {
                         linkUrl = linkData;
@@ -1164,6 +1174,8 @@ function displayExternalLinks(data) {
                         locationInfo = {};
                         cssSelector = '';
                         context = {};
+                        rel = [];
+                        target = '';
                     } else if (typeof linkData === 'object') {
                         linkUrl = linkData.url || linkData.href || '';
                         anchorText = linkData.anchor_text || '';
@@ -1175,12 +1187,16 @@ function displayExternalLinks(data) {
                         };
                         cssSelector = linkData.css_selector || '';
                         context = linkData.context || {};
+                        rel = linkData.rel || [];
+                        target = linkData.target || '';
                     } else {
                         linkUrl = String(linkData);
                         anchorText = '';
                         locationInfo = {};
                         cssSelector = '';
                         context = {};
+                        rel = [];
+                        target = '';
                     }
                     
                     if (!linkUrl) return;
@@ -1193,6 +1209,9 @@ function displayExternalLinks(data) {
                         var domain = linkUrl;
                     }
                     
+                    // Merge with analyzed data if available
+                    const analyzed = analyzedLinksMap[linkUrl] || {};
+                    
                     allExternalLinks.push({
                         url: linkUrl,
                         domain: domain,
@@ -1202,20 +1221,43 @@ function displayExternalLinks(data) {
                         anchor_text: anchorText,
                         location_info: locationInfo,
                         css_selector: cssSelector,
-                        context: context
+                        context: context,
+                        rel: rel,
+                        target: target,
+                        // Enhanced analysis data
+                        accessible: analyzed.accessible,
+                        status_code: analyzed.status_code,
+                        status_text: analyzed.status_text,
+                        category: analyzed.category || 'Other',
+                        link_type: analyzed.link_type || (rel.includes('nofollow') ? 'Nofollow' : 'Follow'),
+                        quality_score: analyzed.quality_score,
+                        has_ssl: analyzed.has_ssl,
+                        response_time: analyzed.response_time,
+                        final_url: analyzed.final_url,
+                        redirect_count: analyzed.redirect_count
                     });
                 });
             }
         });
     }
     
-    // Group by unique URL
+    // Group by unique URL and merge analysis data
     const uniqueLinks = {};
     allExternalLinks.forEach(link => {
         if (!uniqueLinks[link.url]) {
             uniqueLinks[link.url] = {
                 url: link.url,
                 domain: link.domain,
+                category: link.category || 'Other',
+                link_type: link.link_type || 'Follow',
+                accessible: link.accessible,
+                status_code: link.status_code,
+                status_text: link.status_text,
+                quality_score: link.quality_score || { score: 0, level: 'Unknown' },
+                has_ssl: link.has_ssl,
+                response_time: link.response_time,
+                redirect_count: link.redirect_count || 0,
+                final_url: link.final_url || link.url,
                 sources: []
             };
         }
@@ -1226,7 +1268,9 @@ function displayExternalLinks(data) {
             anchor_text: link.anchor_text,
             location_info: link.location_info,
             css_selector: link.css_selector,
-            context: link.context
+            context: link.context,
+            rel: link.rel || [],
+            target: link.target || ''
         });
     });
     
@@ -1239,7 +1283,57 @@ function displayExternalLinks(data) {
         externalLinksTotal.textContent = totalLinks;
     }
     
-    // Populate page filter
+    // Display summary statistics
+    if (summaryContainer && data.external_links_analysis && data.external_links_analysis.summary) {
+        const summary = data.external_links_analysis.summary;
+        const accessible = summary.accessible || 0;
+        const inaccessible = summary.inaccessible || 0;
+        const withSSL = summary.with_ssl || 0;
+        
+        summaryContainer.innerHTML = `
+            <div class="external-links-summary-grid">
+                <div class="summary-stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>${summary.total || totalLinks}</h3>
+                        <p>Total Links Analyzed</p>
+                    </div>
+                </div>
+                <div class="summary-stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>${accessible}</h3>
+                        <p>Accessible Links</p>
+                    </div>
+                </div>
+                <div class="summary-stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>${inaccessible}</h3>
+                        <p>Inaccessible Links</p>
+                    </div>
+                </div>
+                <div class="summary-stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>${withSSL}</h3>
+                        <p>HTTPS Links</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        summaryContainer.style.display = 'block';
+    }
+    
+    // Populate filters
     const pageFilter = document.getElementById('externalPageFilter');
     if (pageFilter && data.pages) {
         pageFilter.innerHTML = '<option value="all">All Pages</option>';
@@ -1251,21 +1345,36 @@ function displayExternalLinks(data) {
         });
     }
     
+    // Populate category filter
+    const categoryFilter = document.getElementById('externalCategoryFilter');
+    if (categoryFilter) {
+        const categories = [...new Set(Object.values(uniqueLinks).map(l => l.category || 'Other'))].sort();
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            categoryFilter.appendChild(option);
+        });
+    }
+    
     if (totalLinks === 0) {
         container.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No external links found.</p></div>';
         return;
     }
     
-    // Create compact table format
+    // Create enhanced table format with analysis data
     let html = `
         <div class="table-container">
             <table class="data-table external-links-table">
                 <thead>
                     <tr>
-                        <th style="width: 30%;">External URL / Domain</th>
-                        <th style="width: 25%;">Source Page</th>
-                        <th style="width: 20%;">Anchor Text</th>
-                        <th style="width: 15%;">Location</th>
+                        <th style="width: 20%;">External URL / Domain</th>
+                        <th style="width: 15%;">Status</th>
+                        <th style="width: 10%;">Category</th>
+                        <th style="width: 10%;">Link Type</th>
+                        <th style="width: 10%;">Quality</th>
+                        <th style="width: 15%;">Source Page</th>
+                        <th style="width: 10%;">Anchor Text</th>
                         <th style="width: 10%;">Actions</th>
                     </tr>
                 </thead>
@@ -1284,32 +1393,54 @@ function displayExternalLinks(data) {
             const isFirstSource = sourceIndex === 0;
             const rowspan = sourceIndex === 0 ? linkData.sources.length : 0;
             
-            // Build location string
-            const locationParts = [];
-            if (source.location_info.parent_tag) {
-                locationParts.push(`<${source.location_info.parent_tag}>`);
-            }
-            if (source.location_info.parent_class) {
-                const classes = source.location_info.parent_class.split(' ')[0];
-                if (classes) locationParts.push(`.${classes}`);
-            }
-            if (source.location_info.parent_id) {
-                locationParts.push(`#${source.location_info.parent_id}`);
-            }
-            const locationStr = locationParts.length > 0 ? locationParts.join(' ') : 'Unknown';
-            
             // Get domain display
-            const domainDisplay = linkData.domain.length > 40 
-                ? linkData.domain.substring(0, 37) + '...' 
+            const domainDisplay = linkData.domain.length > 30 
+                ? linkData.domain.substring(0, 27) + '...' 
                 : linkData.domain;
             
             // Get URL display (shortened)
-            const urlDisplay = linkData.url.length > 50
-                ? linkData.url.substring(0, 47) + '...'
+            const urlDisplay = linkData.url.length > 40
+                ? linkData.url.substring(0, 37) + '...'
                 : linkData.url;
             
+            // Status badge
+            const statusCode = linkData.status_code || 0;
+            const statusText = linkData.status_text || 'Unknown';
+            const isAccessible = linkData.accessible !== false;
+            const statusClass = isAccessible ? 'status-success' : 'status-error';
+            const statusIcon = isAccessible ? 'fa-check-circle' : 'fa-times-circle';
+            
+            // Category badge
+            const category = linkData.category || 'Other';
+            const categoryColors = {
+                'Social Media': '#3b82f6',
+                'E-commerce': '#10b981',
+                'News': '#f59e0b',
+                'Search Engine': '#8b5cf6',
+                'Analytics': '#06b6d4',
+                'Payment': '#ef4444',
+                'Other': '#6b7280'
+            };
+            const categoryColor = categoryColors[category] || '#6b7280';
+            
+            // Link type badge
+            const linkType = linkData.link_type || 'Follow';
+            const linkTypeClass = linkType.includes('Nofollow') ? 'badge-warning' : 
+                                 linkType.includes('Sponsored') ? 'badge-danger' : 
+                                 linkType.includes('UGC') ? 'badge-info' : 'badge-success';
+            
+            // Quality score
+            const quality = linkData.quality_score || {};
+            const qualityScore = quality.score || 0;
+            const qualityLevel = quality.level || 'Unknown';
+            const qualityClass = qualityLevel === 'Excellent' ? 'quality-excellent' :
+                                qualityLevel === 'Good' ? 'quality-good' :
+                                qualityLevel === 'Fair' ? 'quality-fair' : 'quality-poor';
+            
             html += `
-                <tr class="external-link-row" data-link-index="${index}" data-source-index="${sourceIndex}">
+                <tr class="external-link-row" data-link-index="${index}" data-source-index="${sourceIndex}" 
+                    data-category="${category}" data-link-type="${linkType}" data-quality="${qualityLevel}" 
+                    data-accessible="${isAccessible}">
             `;
             
             // External URL / Domain (only show on first row)
@@ -1322,11 +1453,43 @@ function displayExternalLinks(data) {
                                 <a href="${linkData.url}" target="_blank" rel="noopener noreferrer" title="${linkData.url}">
                                     ${urlDisplay}
                                 </a>
+                                ${linkData.has_ssl ? '<i class="fas fa-lock" style="color: #10b981; margin-left: 5px;" title="HTTPS"></i>' : ''}
                             </div>
                             <div class="external-domain">
                                 <i class="fas fa-globe"></i> ${domainDisplay}
                             </div>
                             ${linkData.sources.length > 1 ? `<div class="link-count-badge">${linkData.sources.length} pages</div>` : ''}
+                        </div>
+                    </td>
+                    
+                    <!-- Status (only show on first row) -->
+                    <td rowspan="${rowspan}" class="status-cell">
+                        <div class="status-info">
+                            <span class="status-badge ${statusClass}" title="${statusText}">
+                                <i class="fas ${statusIcon}"></i> ${statusCode || 'N/A'}
+                            </span>
+                            ${linkData.response_time ? `<div class="response-time">${linkData.response_time}ms</div>` : ''}
+                            ${linkData.redirect_count > 0 ? `<div class="redirect-info"><i class="fas fa-arrow-right"></i> ${linkData.redirect_count} redirects</div>` : ''}
+                        </div>
+                    </td>
+                    
+                    <!-- Category (only show on first row) -->
+                    <td rowspan="${rowspan}" class="category-cell">
+                        <span class="category-badge" style="background-color: ${categoryColor}20; color: ${categoryColor}; border: 1px solid ${categoryColor}40;">
+                            ${category}
+                        </span>
+                    </td>
+                    
+                    <!-- Link Type (only show on first row) -->
+                    <td rowspan="${rowspan}" class="link-type-cell">
+                        <span class="badge ${linkTypeClass}">${linkType}</span>
+                    </td>
+                    
+                    <!-- Quality (only show on first row) -->
+                    <td rowspan="${rowspan}" class="quality-cell">
+                        <div class="quality-info">
+                            <span class="quality-badge ${qualityClass}">${qualityScore}/100</span>
+                            <div class="quality-level">${qualityLevel}</div>
                         </div>
                     </td>
                 `;
@@ -1337,9 +1500,8 @@ function displayExternalLinks(data) {
                 <td class="source-page-cell">
                     <div class="source-page-info">
                         <a href="${source.page_url}" target="_blank" title="${source.page_url}">
-                            ${source.page_title || source.page_url}
+                            ${(source.page_title || source.page_url).length > 30 ? (source.page_title || source.page_url).substring(0, 27) + '...' : (source.page_title || source.page_url)}
                         </a>
-                        <span class="status-badge status-${source.page_status === 200 ? '200' : 'error'}">${source.page_status || 'Unknown'}</span>
                     </div>
                 </td>
             `;
@@ -1347,15 +1509,7 @@ function displayExternalLinks(data) {
             // Anchor Text
             html += `
                 <td class="anchor-text-cell">
-                    ${source.anchor_text ? `<span class="anchor-text-display" title="${source.anchor_text}">"${source.anchor_text.length > 30 ? source.anchor_text.substring(0, 27) + '...' : source.anchor_text}"</span>` : '<span class="text-muted">(no text)</span>'}
-                </td>
-            `;
-            
-            // Location
-            html += `
-                <td class="location-cell">
-                    <span class="location-display" title="${locationStr}">${locationStr.length > 25 ? locationStr.substring(0, 22) + '...' : locationStr}</span>
-                    ${source.css_selector ? `<div class="css-selector-hint" title="CSS: ${source.css_selector}"><i class="fas fa-code"></i></div>` : ''}
+                    ${source.anchor_text ? `<span class="anchor-text-display" title="${source.anchor_text}">"${source.anchor_text.length > 25 ? source.anchor_text.substring(0, 22) + '...' : source.anchor_text}"</span>` : '<span class="text-muted">(no text)</span>'}
                 </td>
             `;
             
@@ -1390,14 +1544,22 @@ function displayExternalLinks(data) {
     setupExternalLinksFilter();
 }
 
-// Setup external links filter
+// Setup external links filter (ENHANCED)
 function setupExternalLinksFilter() {
     const searchInput = document.getElementById('externalSearchInput');
     const pageFilter = document.getElementById('externalPageFilter');
+    const categoryFilter = document.getElementById('externalCategoryFilter');
+    const typeFilter = document.getElementById('externalTypeFilter');
+    const qualityFilter = document.getElementById('externalQualityFilter');
+    const accessibilityFilter = document.getElementById('externalAccessibilityFilter');
     
     const filterLinks = () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedPage = pageFilter.value;
+        const searchTerm = (searchInput?.value || '').toLowerCase();
+        const selectedPage = pageFilter?.value || 'all';
+        const selectedCategory = categoryFilter?.value || 'all';
+        const selectedType = typeFilter?.value || 'all';
+        const selectedQuality = qualityFilter?.value || 'all';
+        const selectedAccessibility = accessibilityFilter?.value || 'all';
         
         const linkRows = document.querySelectorAll('.external-link-row');
         linkRows.forEach(row => {
@@ -1444,8 +1606,53 @@ function setupExternalLinksFilter() {
                 }
             }
             
+            // Category filter
+            if (selectedCategory !== 'all') {
+                if (linkData.category !== selectedCategory) {
+                    show = false;
+                }
+            }
+            
+            // Link type filter
+            if (selectedType !== 'all') {
+                const linkType = linkData.link_type || 'Follow';
+                if (!linkType.includes(selectedType)) {
+                    show = false;
+                }
+            }
+            
+            // Quality filter
+            if (selectedQuality !== 'all') {
+                const quality = linkData.quality_score?.level || 'Unknown';
+                if (quality !== selectedQuality) {
+                    show = false;
+                }
+            }
+            
+            // Accessibility filter
+            if (selectedAccessibility !== 'all') {
+                const isAccessible = linkData.accessible !== false;
+                if (selectedAccessibility === 'accessible' && !isAccessible) {
+                    show = false;
+                } else if (selectedAccessibility === 'inaccessible' && isAccessible) {
+                    show = false;
+                }
+            }
+            
             row.style.display = show ? '' : 'none';
         });
+        
+        // Update visible count
+        const visibleCount = document.querySelectorAll('.external-link-row[style=""]').length;
+        const totalCount = linkRows.length;
+        const countEl = document.getElementById('externalLinksCount');
+        if (countEl) {
+            if (visibleCount < totalCount) {
+                countEl.textContent = `${visibleCount} of ${totalCount} links`;
+            } else {
+                countEl.textContent = `${totalCount} unique links`;
+            }
+        }
     };
     
     if (searchInput) {
@@ -1454,58 +1661,142 @@ function setupExternalLinksFilter() {
     if (pageFilter) {
         pageFilter.addEventListener('change', filterLinks);
     }
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', filterLinks);
+    }
+    if (typeFilter) {
+        typeFilter.addEventListener('change', filterLinks);
+    }
+    if (qualityFilter) {
+        qualityFilter.addEventListener('change', filterLinks);
+    }
+    if (accessibilityFilter) {
+        accessibilityFilter.addEventListener('change', filterLinks);
+    }
 }
 
-// Show external link details modal
+// Show external link details modal (ENHANCED)
 function showExternalLinkDetails(linkIndex, sourceIndex) {
     if (!window.externalLinksData || !window.externalLinksData[linkIndex]) return;
     
     const linkData = window.externalLinksData[linkIndex];
-    const source = linkData.sources[sourceIndex];
+    const source = linkData.sources[sourceIndex] || linkData.sources[0];
     
     if (!source) return;
     
     const locationParts = [];
-    if (source.location_info.parent_tag) locationParts.push(`<${source.location_info.parent_tag}>`);
-    if (source.location_info.parent_class) {
+    if (source.location_info?.parent_tag) locationParts.push(`<${source.location_info.parent_tag}>`);
+    if (source.location_info?.parent_class) {
         const classes = source.location_info.parent_class.split(' ')[0];
         if (classes) locationParts.push(`.${classes}`);
     }
-    if (source.location_info.parent_id) locationParts.push(`#${source.location_info.parent_id}`);
+    if (source.location_info?.parent_id) locationParts.push(`#${source.location_info.parent_id}`);
     const locationStr = locationParts.join(' ') || 'Unknown location';
     
     const contextBefore = (source.context?.before || '').substring(0, 100);
     const contextAfter = (source.context?.after || '').substring(0, 100);
     
+    // Enhanced analysis data
+    const statusCode = linkData.status_code || 0;
+    const statusText = linkData.status_text || 'Not analyzed';
+    const isAccessible = linkData.accessible !== false;
+    const category = linkData.category || 'Other';
+    const linkType = linkData.link_type || 'Follow';
+    const quality = linkData.quality_score || {};
+    const qualityScore = quality.score || 0;
+    const qualityLevel = quality.level || 'Unknown';
+    const hasSSL = linkData.has_ssl || false;
+    const responseTime = linkData.response_time || 0;
+    const redirectCount = linkData.redirect_count || 0;
+    const finalUrl = linkData.final_url || linkData.url;
+    
     let modalHtml = `
         <div class="modal" id="externalLinkModal" style="display: block;">
-            <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-content" style="max-width: 900px;">
                 <div class="modal-header">
                     <h2><i class="fas fa-external-link-alt"></i> External Link Details</h2>
                     <span class="close" onclick="closeExternalLinkModal()">&times;</span>
                 </div>
                 <div class="modal-body">
+                    <!-- Link Information -->
                     <div class="location-details-section">
                         <h3><i class="fas fa-link"></i> External URL</h3>
                         <p><a href="${linkData.url}" target="_blank" rel="noopener noreferrer">${linkData.url}</a></p>
                         <p><strong>Domain:</strong> ${linkData.domain}</p>
+                        ${finalUrl !== linkData.url ? `<p><strong>Final URL (after redirects):</strong> <a href="${finalUrl}" target="_blank">${finalUrl}</a></p>` : ''}
                     </div>
                     
+                    <!-- Analysis Results -->
+                    <div class="location-details-section">
+                        <h3><i class="fas fa-chart-line"></i> Analysis Results</h3>
+                        <div class="analysis-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 10px;">
+                            <div class="analysis-item">
+                                <strong>Status:</strong> 
+                                <span class="status-badge ${isAccessible ? 'status-success' : 'status-error'}">
+                                    ${statusCode || 'N/A'} - ${statusText}
+                                </span>
+                            </div>
+                            <div class="analysis-item">
+                                <strong>Accessible:</strong> 
+                                <span class="badge ${isAccessible ? 'badge-success' : 'badge-danger'}">
+                                    ${isAccessible ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                            <div class="analysis-item">
+                                <strong>Category:</strong> 
+                                <span class="category-badge">${category}</span>
+                            </div>
+                            <div class="analysis-item">
+                                <strong>Link Type:</strong> 
+                                <span class="badge ${linkType.includes('Nofollow') ? 'badge-warning' : 'badge-success'}">${linkType}</span>
+                            </div>
+                            <div class="analysis-item">
+                                <strong>Quality Score:</strong> 
+                                <span class="quality-badge quality-${qualityLevel.toLowerCase()}">${qualityScore}/100 (${qualityLevel})</span>
+                            </div>
+                            <div class="analysis-item">
+                                <strong>HTTPS:</strong> 
+                                <span class="badge ${hasSSL ? 'badge-success' : 'badge-warning'}">
+                                    ${hasSSL ? '<i class="fas fa-lock"></i> Yes' : '<i class="fas fa-unlock"></i> No'}
+                                </span>
+                            </div>
+                            ${responseTime > 0 ? `<div class="analysis-item">
+                                <strong>Response Time:</strong> ${responseTime}ms
+                            </div>` : ''}
+                            ${redirectCount > 0 ? `<div class="analysis-item">
+                                <strong>Redirects:</strong> ${redirectCount}
+                            </div>` : ''}
+                        </div>
+                        ${quality.factors && quality.factors.length > 0 ? `
+                        <div style="margin-top: 15px;">
+                            <strong>Quality Factors:</strong>
+                            <ul style="margin-top: 5px; padding-left: 20px;">
+                                ${quality.factors.map(factor => `<li>${factor}</li>`).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Source Page -->
                     <div class="location-details-section">
                         <h3><i class="fas fa-file-alt"></i> Source Page</h3>
                         <p><a href="${source.page_url}" target="_blank">${source.page_title || source.page_url}</a></p>
                         <p><strong>Status:</strong> <span class="status-badge status-${source.page_status === 200 ? '200' : 'error'}">${source.page_status || 'Unknown'}</span></p>
                     </div>
                     
+                    <!-- Anchor Text & Attributes -->
                     <div class="location-details-section">
-                        <h3><i class="fas fa-quote-left"></i> Anchor Text</h3>
-                        <p>${source.anchor_text || '(no anchor text)'}</p>
+                        <h3><i class="fas fa-quote-left"></i> Anchor Text & Attributes</h3>
+                        <p><strong>Anchor Text:</strong> ${source.anchor_text || '(no anchor text)'}</p>
+                        ${source.rel && source.rel.length > 0 ? `<p><strong>Rel Attributes:</strong> ${source.rel.join(', ')}</p>` : ''}
+                        ${source.target ? `<p><strong>Target:</strong> ${source.target}</p>` : ''}
                     </div>
                     
+                    <!-- Location Information -->
                     <div class="location-details-section">
                         <h3><i class="fas fa-map-marker-alt"></i> Location Information</h3>
                         <p><strong>HTML Element:</strong> ${locationStr}</p>
-                        ${source.location_info.line_number > 0 ? `<p><strong>Line Number:</strong> ${source.location_info.line_number}</p>` : ''}
+                        ${source.location_info?.line_number > 0 ? `<p><strong>Line Number:</strong> ${source.location_info.line_number}</p>` : ''}
                         ${source.css_selector ? `<p><strong>CSS Selector:</strong> <code>${source.css_selector}</code></p>` : ''}
                     </div>
                     
@@ -4973,4 +5264,319 @@ function showDOMDetails(page) {
     `;
     
     modal.style.display = 'block';
+}
+
+// Display Skipped Pages section (similar to Siteliner)
+function displaySkippedPages(data) {
+    const container = document.getElementById('skippedPagesContainer');
+    if (!container) return;
+    
+    const skippedPages = data.skipped_pages || [];
+    
+    if (skippedPages.length === 0) {
+        container.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i><p>No pages were skipped during crawling.</p></div>';
+        return;
+    }
+    
+    // Get page power data if available
+    const pagePowers = data.page_power_stats?.page_powers || {};
+    
+    // Sort by skip reason, then by URL
+    const sortedSkipped = [...skippedPages].sort((a, b) => {
+        if (a.skip_reason !== b.skip_reason) {
+            return a.skip_reason.localeCompare(b.skip_reason);
+        }
+        return a.url.localeCompare(b.url);
+    });
+    
+    // Get unique skip reasons for filter
+    const skipReasons = [...new Set(skippedPages.map(sp => sp.skip_reason))].sort();
+    
+    let html = `
+        <div class="skipped-pages-header">
+            <p class="subtitle">To see complete results for a specific page, click on a row in the table below:</p>
+            <div class="skipped-pages-controls">
+                <div class="filter-group">
+                    <label for="skippedPagesFilter">Filter results by:</label>
+                    <select id="skippedPagesFilter" class="filter-select">
+                        <option value="all">Show All</option>
+                        ${skipReasons.map(reason => `<option value="${reason.replace(/"/g, '&quot;')}">${reason}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table id="skippedPagesTable" class="data-table">
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th class="sortable" data-sort="reason">Skip Reason <i class="fas fa-sort"></i></th>
+                        <th class="sortable" data-sort="power">Page Power</th>
+                        <th class="sortable" data-sort="links">Links In</th>
+                    </tr>
+                </thead>
+                <tbody id="skippedPagesTableBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination-container" id="skippedPagesPagination">
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Store data globally for filtering and pagination
+    window.skippedPagesData = sortedSkipped;
+    window.currentSkippedPage = 1;
+    window.itemsPerPage = 12;
+    
+    // Render table
+    renderSkippedPagesTable();
+    
+    // Add filter event listener
+    const filter = document.getElementById('skippedPagesFilter');
+    if (filter) {
+        filter.addEventListener('change', (e) => {
+            window.currentSkippedPage = 1;
+            renderSkippedPagesTable();
+        });
+    }
+    
+    // Add sort event listeners
+    document.querySelectorAll('#skippedPagesTable .sortable').forEach(header => {
+        header.addEventListener('click', () => {
+            const sortBy = header.dataset.sort;
+            const currentSort = window.skippedPagesSort || { field: null, direction: 'asc' };
+            
+            if (currentSort.field === sortBy) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.field = sortBy;
+                currentSort.direction = 'asc';
+            }
+            
+            window.skippedPagesSort = currentSort;
+            
+            // Update sort indicators
+            document.querySelectorAll('#skippedPagesTable .sortable i').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            const icon = header.querySelector('i');
+            if (icon) {
+                icon.className = currentSort.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            }
+            
+            // Sort data
+            sortSkippedPages();
+            renderSkippedPagesTable();
+        });
+    });
+    
+    function sortSkippedPages() {
+        const sort = window.skippedPagesSort || { field: null, direction: 'asc' };
+        if (!sort.field) return;
+        
+        window.skippedPagesData.sort((a, b) => {
+            let aVal, bVal;
+            
+            switch(sort.field) {
+                case 'reason':
+                    aVal = a.skip_reason || '';
+                    bVal = b.skip_reason || '';
+                    break;
+                case 'power':
+                    aVal = pagePowers[a.url]?.power || 0;
+                    bVal = pagePowers[b.url]?.power || 0;
+                    break;
+                case 'links':
+                    aVal = a.links_in || 0;
+                    bVal = b.links_in || 0;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+    
+    function renderSkippedPagesTable() {
+        const tbody = document.getElementById('skippedPagesTableBody');
+        const pagination = document.getElementById('skippedPagesPagination');
+        if (!tbody) return;
+        
+        // Get filter value
+        const filterValue = document.getElementById('skippedPagesFilter')?.value || 'all';
+        
+        // Filter data
+        let filteredData = window.skippedPagesData;
+        if (filterValue !== 'all') {
+            filteredData = window.skippedPagesData.filter(sp => sp.skip_reason === filterValue);
+        }
+        
+        // Pagination
+        const totalPages = Math.ceil(filteredData.length / window.itemsPerPage);
+        const startIndex = (window.currentSkippedPage - 1) * window.itemsPerPage;
+        const endIndex = startIndex + window.itemsPerPage;
+        const pageData = filteredData.slice(startIndex, endIndex);
+        
+        // Render table rows
+        tbody.innerHTML = pageData.map((skipped, index) => {
+            const pagePower = pagePowers[skipped.url]?.power || 0;
+            const linksIn = skipped.links_in || 0;
+            const fullIndex = startIndex + index;
+            
+            // Get reason icon
+            let reasonIcon = 'fas fa-ban';
+            if (skipped.skip_reason.includes('noindex')) {
+                reasonIcon = 'fas fa-robot';
+            } else if (skipped.skip_reason.includes('404')) {
+                reasonIcon = 'fas fa-exclamation-triangle';
+            } else if (skipped.skip_reason.includes('Redirect')) {
+                reasonIcon = 'fas fa-arrow-right';
+            } else if (skipped.skip_reason.includes('character set')) {
+                reasonIcon = 'fas fa-language';
+            }
+            
+            return `
+                <tr class="clickable-row" onclick="showSkippedPageDetails('${skipped.url.replace(/'/g, "\\'")}')">
+                    <td class="url-cell">
+                        <a href="${skipped.url}" target="_blank" onclick="event.stopPropagation();">
+                            ${skipped.url}
+                        </a>
+                    </td>
+                    <td>
+                        <i class="${reasonIcon}"></i> ${skipped.skip_reason}
+                    </td>
+                    <td>${pagePower.toFixed(1)}</td>
+                    <td>${linksIn}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Render pagination
+        if (pagination) {
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+            } else {
+                let paginationHTML = '<div class="pagination">';
+                
+                // Previous button
+                if (window.currentSkippedPage > 1) {
+                    paginationHTML += `<button class="pagination-btn" onclick="changeSkippedPage(${window.currentSkippedPage - 1})">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>`;
+                }
+                
+                // Page numbers
+                const maxPagesToShow = 5;
+                let startPage = Math.max(1, window.currentSkippedPage - Math.floor(maxPagesToShow / 2));
+                let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+                
+                if (endPage - startPage < maxPagesToShow - 1) {
+                    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+                }
+                
+                if (startPage > 1) {
+                    paginationHTML += `<button class="pagination-btn" onclick="changeSkippedPage(1)">1</button>`;
+                    if (startPage > 2) {
+                        paginationHTML += `<span class="pagination-ellipsis">...</span>`;
+                    }
+                }
+                
+                for (let i = startPage; i <= endPage; i++) {
+                    paginationHTML += `<button class="pagination-btn ${i === window.currentSkippedPage ? 'active' : ''}" 
+                        onclick="changeSkippedPage(${i})">${i}</button>`;
+                }
+                
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        paginationHTML += `<span class="pagination-ellipsis">...</span>`;
+                    }
+                    paginationHTML += `<button class="pagination-btn" onclick="changeSkippedPage(${totalPages})">${totalPages}</button>`;
+                }
+                
+                // Next button
+                if (window.currentSkippedPage < totalPages) {
+                    paginationHTML += `<button class="pagination-btn" onclick="changeSkippedPage(${window.currentSkippedPage + 1})">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>`;
+                }
+                
+                paginationHTML += '</div>';
+                paginationHTML += `<div class="pagination-info">Showing ${startIndex + 1}–${Math.min(endIndex, filteredData.length)} of ${filteredData.length} results</div>`;
+                paginationHTML += `<div class="pagination-jump">
+                    <label>Jump to result:</label>
+                    <input type="number" id="skippedPagesJumpInput" min="1" max="${totalPages}" value="${window.currentSkippedPage}">
+                    <button class="pagination-btn" onclick="jumpToSkippedPage()">Go</button>
+                </div>`;
+                
+                pagination.innerHTML = paginationHTML;
+            }
+        }
+    }
+    
+    // Make functions globally available
+    window.changeSkippedPage = function(page) {
+        window.currentSkippedPage = page;
+        renderSkippedPagesTable();
+        // Scroll to top of table
+        document.getElementById('skippedPagesTable')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    
+    window.jumpToSkippedPage = function() {
+        const input = document.getElementById('skippedPagesJumpInput');
+        if (input) {
+            const page = parseInt(input.value);
+            const filterValue = document.getElementById('skippedPagesFilter')?.value || 'all';
+            let filteredData = window.skippedPagesData;
+            if (filterValue !== 'all') {
+                filteredData = window.skippedPagesData.filter(sp => sp.skip_reason === filterValue);
+            }
+            const totalPages = Math.ceil(filteredData.length / window.itemsPerPage);
+            if (page >= 1 && page <= totalPages) {
+                window.changeSkippedPage(page);
+            }
+        }
+    };
+    
+    window.showSkippedPageDetails = function(url) {
+        // Find the skipped page data
+        const skippedPage = window.skippedPagesData.find(sp => sp.url === url);
+        if (!skippedPage) return;
+        
+        // Show in page modal or create a simple alert
+        const modal = document.getElementById('pageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        
+        if (modal && modalTitle && modalBody) {
+            modalTitle.textContent = 'Skipped Page Details';
+            modalBody.innerHTML = `
+                <div class="page-details">
+                    <h3>URL</h3>
+                    <p><a href="${skippedPage.url}" target="_blank">${skippedPage.url}</a></p>
+                    
+                    <h3>Skip Reason</h3>
+                    <p>${skippedPage.skip_reason}</p>
+                    
+                    <h3>Status Code</h3>
+                    <p>${skippedPage.status_code || 'N/A'}</p>
+                    
+                    <h3>Links In</h3>
+                    <p>${skippedPage.links_in || 0} internal link(s) point to this page</p>
+                    
+                    <h3>Page Power</h3>
+                    <p>${(pagePowers[skippedPage.url]?.power || 0).toFixed(2)}</p>
+                </div>
+            `;
+            modal.style.display = 'block';
+        } else {
+            alert(`Skipped Page: ${skippedPage.url}\nReason: ${skippedPage.skip_reason}`);
+        }
+    };
 }

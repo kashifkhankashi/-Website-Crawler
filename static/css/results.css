@@ -1387,6 +1387,54 @@ body {
     flex-wrap: wrap;
 }
 
+/* External Links Enhanced Styles */
+.external-links-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.summary-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.summary-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.summary-stat-card .stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.summary-stat-card .stat-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.summary-stat-card .stat-content p {
+    margin: 5px 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
 /* External Links Styles - Compact Table Format */
 .external-links-table {
     font-size: 0.9rem;
@@ -1464,6 +1512,173 @@ body {
     font-size: 0.75rem;
     font-weight: 600;
     margin-top: 4px;
+}
+
+/* Enhanced External Links Styles */
+.external-links-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.summary-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.summary-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.summary-stat-card .stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.summary-stat-card .stat-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.summary-stat-card .stat-content p {
+    margin: 5px 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.status-cell {
+    vertical-align: top;
+}
+
+.status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.status-badge.status-success {
+    background: #10b981;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-badge.status-error {
+    background: #ef4444;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.response-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.redirect-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.category-cell {
+    vertical-align: top;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.link-type-cell {
+    vertical-align: top;
+}
+
+.quality-cell {
+    vertical-align: top;
+}
+
+.quality-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.quality-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.quality-badge.quality-excellent {
+    background: #10b981;
+}
+
+.quality-badge.quality-good {
+    background: #3b82f6;
+}
+
+.quality-badge.quality-fair {
+    background: #f59e0b;
+}
+
+.quality-badge.quality-poor {
+    background: #ef4444;
+}
+
+.quality-level {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.analysis-item {
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.analysis-item strong {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-color);
 }
 
 .source-page-cell {
