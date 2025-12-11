@@ -9017,7 +9017,7 @@ function showAdvancedSEODetails(page) {
     modal.style.display = 'block';
 }
 
-// Display DOM Analysis section
+// Display DOM Analysis section - User-Friendly Version
 function displayDOMAnalysis(data) {
     const container = document.getElementById('domAnalysisContainer');
     if (!container || !data.pages) return;
@@ -9038,130 +9038,410 @@ function displayDOMAnalysis(data) {
     const totalScore = pagesWithDOM.reduce((sum, p) => sum + (p.dom_analysis?.score || 0), 0);
     const avgScore = Math.round(totalScore / pagesWithDOM.length);
     
+    // Determine status levels
+    const getNodeStatus = (nodes) => {
+        if (nodes <= 800) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (nodes <= 1500) return { status: 'good', label: 'Good', color: 'info' };
+        if (nodes <= 2000) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const getDepthStatus = (depth) => {
+        if (depth <= 10) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (depth <= 15) return { status: 'good', label: 'Good', color: 'info' };
+        if (depth <= 20) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const getReflowStatus = (count) => {
+        if (count === 0) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (count <= 5) return { status: 'good', label: 'Good', color: 'info' };
+        if (count <= 15) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const getScoreStatus = (score) => {
+        if (score >= 80) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (score >= 60) return { status: 'good', label: 'Good', color: 'info' };
+        if (score >= 40) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const nodeStatus = getNodeStatus(avgNodes);
+    const depthStatus = getDepthStatus(maxDepth);
+    const reflowStatus = getReflowStatus(totalReflows);
+    const scoreStatus = getScoreStatus(avgScore);
+    
     let html = `
-        <div class="dom-summary">
-            <div class="dom-summary-cards">
-                <div class="dom-card">
-                    <div class="dom-card-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <i class="fas fa-sitemap"></i>
-                    </div>
-                    <div class="dom-card-content">
-                        <h3>${avgNodes.toLocaleString()}</h3>
-                        <p>Avg DOM Nodes</p>
+        <div class="audit-section">
+            <h3><i class="fas fa-sitemap"></i> DOM Structure Analysis</h3>
+            
+            <!-- What is DOM Explanation -->
+            <div style="margin-bottom: 30px;">
+                <div class="info-box" style="padding: 20px; background: #f0f9ff; border-left: 4px solid var(--info-color); border-radius: 4px; margin-bottom: 20px;">
+                    <p style="margin: 0; line-height: 1.8; color: var(--text-color);">
+                        <strong><i class="fas fa-info-circle" style="color: var(--info-color);"></i> What is DOM?</strong><br>
+                        DOM (Document Object Model) is the structure of HTML elements on your webpage. Think of it as the "skeleton" of your page. 
+                        The browser builds this structure when loading your page, and a complex DOM can slow down page rendering and user interaction.
+                    </p>
+                </div>
+                
+                <div class="info-box" style="padding: 20px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="margin: 0; line-height: 1.8; color: var(--text-color);">
+                        <strong><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Why Does DOM Matter?</strong><br>
+                        • <strong>Page Speed:</strong> More DOM nodes = slower page rendering<br>
+                        • <strong>User Experience:</strong> Complex DOM causes layout shifts and slow interactions<br>
+                        • <strong>SEO Impact:</strong> Google considers page speed in rankings<br>
+                        • <strong>Mobile Performance:</strong> Mobile devices struggle more with complex DOM structures
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Overall Score -->
+            <div class="mobile-score-overview" style="margin-bottom: 30px;">
+                <div class="mobile-score-card">
+                    <div class="score-circle-large ${scoreStatus.status}">
+                        <div class="score-value-large">${avgScore}</div>
+                        <div class="score-label-large">DOM Quality Score</div>
                     </div>
                 </div>
-                <div class="dom-card">
-                    <div class="dom-card-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <i class="fas fa-layer-group"></i>
+                <div class="mobile-summary-stats">
+                    <div class="summary-stat">
+                        <i class="fas fa-file-alt" style="color: var(--primary-color);"></i>
+                        <span><strong>${pagesWithDOM.length}</strong> Pages Analyzed</span>
                     </div>
-                    <div class="dom-card-content">
-                        <h3>${maxDepth}</h3>
-                        <p>Max Depth</p>
+                    <div class="summary-stat">
+                        <i class="fas fa-sitemap" style="color: ${nodeStatus.color === 'success' ? 'var(--success-color)' : nodeStatus.color === 'warning' ? '#ffc107' : 'var(--danger-color)'};"></i>
+                        <span><strong>${avgNodes.toLocaleString()}</strong> Avg Nodes</span>
                     </div>
-                </div>
-                <div class="dom-card">
-                    <div class="dom-card-icon" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
-                        <i class="fas fa-sync"></i>
-                    </div>
-                    <div class="dom-card-content">
-                        <h3>${totalReflows}</h3>
-                        <p>Reflow Elements</p>
-                    </div>
-                </div>
-                <div class="dom-card">
-                    <div class="dom-card-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <div class="dom-card-content">
-                        <h3>${avgScore}</h3>
-                        <p>DOM Quality Score</p>
+                    <div class="summary-stat">
+                        <i class="fas fa-exclamation-triangle" style="color: ${scoreStatus.status === 'excellent' || scoreStatus.status === 'good' ? 'var(--success-color)' : '#ffc107'};"></i>
+                        <span><strong>${scoreStatus.label}</strong> Overall Status</span>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="dom-table-section">
-            <h3>Page-by-Page DOM Analysis</h3>
-            <div class="table-container">
-                <table id="domTable">
-                    <thead>
-                        <tr>
-                            <th>Page</th>
-                            <th>DOM Nodes</th>
-                            <th>Depth</th>
-                            <th>Reflow Elements</th>
-                            <th>Section Warnings</th>
-                            <th>Quality Score</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="domTableBody">
-                    </tbody>
-                </table>
+            
+            <!-- Key Metrics with Status -->
+            <div class="metrics-grid" style="margin-bottom: 30px;">
+                <div class="metric-card">
+                    <div class="metric-value">${avgNodes.toLocaleString()}</div>
+                    <div class="metric-label">Average DOM Nodes</div>
+                    <div class="metric-status ${nodeStatus.status}">
+                        <span class="badge badge-${nodeStatus.color}">
+                            <i class="fas fa-${nodeStatus.status === 'excellent' ? 'check-circle' : nodeStatus.status === 'good' ? 'check' : nodeStatus.status === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'}"></i> ${nodeStatus.label}
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+                        ${avgNodes <= 800 ? '✓ Optimal - Fast rendering' : avgNodes <= 1500 ? '⚡ Acceptable' : avgNodes <= 2000 ? '⚠ Large - May slow down page' : '❌ Too Large - Performance issues'}
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${maxDepth}</div>
+                    <div class="metric-label">Maximum Nesting Depth</div>
+                    <div class="metric-status ${depthStatus.status}">
+                        <span class="badge badge-${depthStatus.color}">
+                            <i class="fas fa-${depthStatus.status === 'excellent' ? 'check-circle' : depthStatus.status === 'good' ? 'check' : depthStatus.status === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'}"></i> ${depthStatus.label}
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+                        ${maxDepth <= 10 ? '✓ Shallow - Easy to parse' : maxDepth <= 15 ? '⚡ Moderate depth' : maxDepth <= 20 ? '⚠ Deep nesting' : '❌ Very deep - Layout issues'}
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${totalReflows}</div>
+                    <div class="metric-label">Reflow Elements</div>
+                    <div class="metric-status ${reflowStatus.status}">
+                        <span class="badge badge-${reflowStatus.color}">
+                            <i class="fas fa-${reflowStatus.status === 'excellent' ? 'check-circle' : reflowStatus.status === 'good' ? 'check' : reflowStatus.status === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'}"></i> ${reflowStatus.label}
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+                        ${totalReflows === 0 ? '✓ No reflow issues' : totalReflows <= 5 ? '⚡ Few issues' : totalReflows <= 15 ? '⚠ Several issues' : '❌ Many layout shifts'}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Metrics Explanation -->
+            <div class="audit-subsection" style="margin-bottom: 30px;">
+                <h4><i class="fas fa-chart-bar"></i> Understanding Your DOM Metrics</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                    <div style="padding: 15px; background: white; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h5 style="margin: 0 0 10px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-sitemap"></i> DOM Nodes
+                        </h5>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--text-secondary);">
+                            The total number of HTML elements (tags) on your page. Each <code>&lt;div&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;span&gt;</code> counts as a node.
+                        </p>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8;">
+                            <li><strong>&lt;800:</strong> Excellent - Fast rendering</li>
+                            <li><strong>800-1500:</strong> Good - Acceptable</li>
+                            <li><strong>1500-2000:</strong> Warning - May slow down</li>
+                            <li><strong>&gt;2000:</strong> Critical - Performance issues</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="padding: 15px; background: white; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h5 style="margin: 0 0 10px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-layer-group"></i> Nesting Depth
+                        </h5>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--text-secondary);">
+                            How many levels deep elements are nested. Example: <code>&lt;div&gt;&lt;div&gt;&lt;p&gt;</code> = 3 levels.
+                        </p>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8;">
+                            <li><strong>&lt;10:</strong> Excellent - Clean structure</li>
+                            <li><strong>10-15:</strong> Good - Normal nesting</li>
+                            <li><strong>15-20:</strong> Warning - Deep nesting</li>
+                            <li><strong>&gt;20:</strong> Critical - Too complex</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="padding: 15px; background: white; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h5 style="margin: 0 0 10px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-sync"></i> Reflow Elements
+                        </h5>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--text-secondary);">
+                            Elements with inline styles that force the browser to recalculate layout, causing visual "jumps" or slow rendering.
+                        </p>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8;">
+                            <li><strong>0:</strong> Excellent - No reflows</li>
+                            <li><strong>1-5:</strong> Good - Minimal impact</li>
+                            <li><strong>5-15:</strong> Warning - Some layout shifts</li>
+                            <li><strong>&gt;15:</strong> Critical - Many shifts</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page-by-Page Analysis -->
+            <div class="audit-subsection">
+                <h4><i class="fas fa-list"></i> Page-by-Page DOM Analysis</h4>
+                <div class="table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Page</th>
+                                <th>DOM Nodes</th>
+                                <th>Depth</th>
+                                <th>Issues</th>
+                                <th>Quality Score</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="domTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Comprehensive Fix Guide -->
+            <div style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                <h4 style="margin-top: 0; color: var(--primary-color); display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-wrench"></i> Complete DOM Optimization Guide
+                </h4>
+                <div style="margin-top: 25px;">
+                    <div style="margin-bottom: 25px;">
+                        <h5 style="color: var(--text-color); margin-bottom: 10px; font-size: 1.1rem;">
+                            <i class="fas fa-check-circle" style="color: var(--success-color);"></i> 1. Reduce DOM Nodes (Priority: ${avgNodes > 2000 ? 'Critical' : avgNodes > 1500 ? 'High' : 'Medium'})
+                        </h5>
+                        <div style="background: white; padding: 20px; border-radius: 6px; margin-left: 25px;">
+                            <p style="margin: 0 0 15px 0; color: var(--text-secondary); line-height: 1.8;">
+                                <strong>Problem:</strong> Too many HTML elements slow down page rendering and increase memory usage.<br><br>
+                                <strong>Solutions:</strong>
+                            </p>
+                            <ol style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                                <li><strong>Remove unnecessary wrapper divs:</strong> Eliminate extra containers that don't serve a purpose</li>
+                                <li><strong>Use semantic HTML:</strong> Replace <code>&lt;div&gt;</code> with <code>&lt;header&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;section&gt;</code>, <code>&lt;article&gt;</code>, <code>&lt;aside&gt;</code>, <code>&lt;footer&gt;</code></li>
+                                <li><strong>Lazy load content:</strong> Load content below the fold only when user scrolls</li>
+                                <li><strong>Optimize lists:</strong> Use pagination or virtualization for long lists (100+ items)</li>
+                                <li><strong>Remove commented code:</strong> Delete unused HTML and CSS comments</li>
+                                <li><strong>Minimize third-party widgets:</strong> Lazy load social media embeds, ads, and chat widgets</li>
+                            </ol>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <h5 style="color: var(--text-color); margin-bottom: 10px; font-size: 1.1rem;">
+                            <i class="fas fa-check-circle" style="color: var(--success-color);"></i> 2. Reduce Nesting Depth
+                        </h5>
+                        <div style="background: white; padding: 20px; border-radius: 6px; margin-left: 25px;">
+                            <p style="margin: 0 0 15px 0; color: var(--text-secondary); line-height: 1.8;">
+                                <strong>Target:</strong> Keep nesting depth under 10-15 levels for optimal performance.<br><br>
+                                <strong>Strategies:</strong>
+                            </p>
+                            <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                                <li><strong>Flatten structure:</strong> Remove unnecessary nested containers</li>
+                                <li><strong>Use CSS Grid/Flexbox:</strong> Instead of nested divs for layout, use modern CSS</li>
+                                <li><strong>Avoid table nesting:</strong> Don't nest tables inside tables - use CSS for layouts</li>
+                                <li><strong>Simplify component structure:</strong> Review React/Vue components for excessive nesting</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <h5 style="color: var(--text-color); margin-bottom: 10px; font-size: 1.1rem;">
+                            <i class="fas fa-check-circle" style="color: var(--success-color);"></i> 3. Fix Reflow Issues
+                        </h5>
+                        <div style="background: white; padding: 20px; border-radius: 6px; margin-left: 25px;">
+                            <p style="margin: 0 0 15px 0; color: var(--text-secondary); line-height: 1.8;">
+                                <strong>What causes reflows:</strong> Inline styles, especially width/height/position changes, force the browser to recalculate layout.<br><br>
+                                <strong>Best Practices:</strong>
+                            </p>
+                            <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                                <li><strong>Move all styles to CSS:</strong> Never use inline <code>style</code> attributes</li>
+                                <li><strong>Use CSS classes:</strong> Create reusable styles in your stylesheet</li>
+                                <li><strong>Avoid layout changes:</strong> Don't change width/height with JavaScript during page load</li>
+                                <li><strong>Use CSS transforms:</strong> For animations, use <code>transform</code> and <code>opacity</code> instead of changing position/size</li>
+                                <li><strong>Batch DOM changes:</strong> If you must change styles with JS, batch them together</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 6px;">
+                        <p style="margin: 0; color: #856404; line-height: 1.8;">
+                            <strong><i class="fas fa-lightbulb"></i> Pro Tips:</strong><br>
+                            • Focus on pages with Critical status first (highest impact)<br>
+                            • Use browser DevTools (Elements tab) to inspect DOM structure<br>
+                            • Test page speed before and after optimizations using Google PageSpeed Insights<br>
+                            • Aim for DOM nodes under 800 for optimal performance<br>
+                            • Remember: Simpler DOM = Faster page = Better SEO = Happier users
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     `;
     
     container.innerHTML = html;
     
+    // Store pages data globally for access in detail view
+    if (!window.domAnalysisPages) {
+        window.domAnalysisPages = {};
+    }
+    
     // Populate table
     const tbody = document.getElementById('domTableBody');
     if (!tbody) return;
     
-    // Sort by node count (highest first)
-    const sortedPages = [...pagesWithDOM].sort((a, b) => 
-        (b.dom_analysis?.total_nodes || 0) - (a.dom_analysis?.total_nodes || 0)
-    );
+    // Sort by issues (pages with most issues first)
+    const sortedPages = [...pagesWithDOM].sort((a, b) => {
+        const aIssues = (a.dom_analysis?.reflow_elements?.length || 0) + (a.dom_analysis?.section_warnings?.length || 0);
+        const bIssues = (b.dom_analysis?.reflow_elements?.length || 0) + (b.dom_analysis?.section_warnings?.length || 0);
+        return bIssues - aIssues;
+    });
     
     sortedPages.forEach(page => {
+        // Store page data for detail view
+        window.domAnalysisPages[page.url] = page;
         const dom = page.dom_analysis || {};
         const nodeCount = dom.total_nodes || 0;
         const depth = dom.deepest_depth || 0;
         const reflows = dom.reflow_elements?.length || 0;
         const warnings = dom.section_warnings?.length || 0;
         const score = dom.score || 0;
-        const scoreClass = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor';
+        const totalIssues = reflows + warnings;
+        
+        const pageNodeStatus = getNodeStatus(nodeCount);
+        const pageDepthStatus = getDepthStatus(depth);
+        const pageScoreStatus = getScoreStatus(score);
+        
+        // Determine overall page status
+        let overallStatus = 'excellent';
+        let overallColor = 'success';
+        let overallLabel = 'Excellent';
+        if (pageNodeStatus.status === 'critical' || pageDepthStatus.status === 'critical' || totalIssues > 15 || score < 40) {
+            overallStatus = 'critical';
+            overallColor = 'danger';
+            overallLabel = 'Critical';
+        } else if (pageNodeStatus.status === 'warning' || pageDepthStatus.status === 'warning' || totalIssues > 5 || score < 60) {
+            overallStatus = 'warning';
+            overallColor = 'warning';
+            overallLabel = 'Warning';
+        } else if (pageNodeStatus.status === 'good' || pageDepthStatus.status === 'good' || totalIssues > 0 || score < 80) {
+            overallStatus = 'good';
+            overallColor = 'info';
+            overallLabel = 'Good';
+        }
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><a href="${page.url}" target="_blank">${page.url.substring(0, 50)}${page.url.length > 50 ? '...' : ''}</a></td>
             <td>
-                <span class="${nodeCount > 2000 ? 'text-danger' : nodeCount > 1000 ? 'text-warning' : 'text-success'}">
+                <span class="badge badge-${overallColor}">
+                    <i class="fas fa-${overallStatus === 'excellent' ? 'check-circle' : overallStatus === 'good' ? 'check' : overallStatus === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'}"></i> ${overallLabel}
+                </span>
+            </td>
+            <td>
+                <a href="${page.url}" target="_blank">${truncateUrl(page.url, 50)}</a><br>
+                <small style="color: var(--text-secondary);">${escapeHtml(page.title || '').substring(0, 40)}${page.title && page.title.length > 40 ? '...' : ''}</small>
+            </td>
+            <td>
+                <strong style="color: ${pageNodeStatus.color === 'success' ? 'var(--success-color)' : pageNodeStatus.color === 'warning' ? '#ffc107' : 'var(--danger-color)'};">
                     ${nodeCount.toLocaleString()}
-                </span>
+                </strong>
+                <br><small style="color: var(--text-secondary);">${pageNodeStatus.label}</small>
             </td>
             <td>
-                <span class="${depth > 15 ? 'text-danger' : depth > 10 ? 'text-warning' : 'text-success'}">
+                <strong style="color: ${pageDepthStatus.color === 'success' ? 'var(--success-color)' : pageDepthStatus.color === 'warning' ? '#ffc107' : 'var(--danger-color)'};">
                     ${depth} levels
+                </strong>
+                <br><small style="color: var(--text-secondary);">${pageDepthStatus.label}</small>
+            </td>
+            <td>
+                ${totalIssues > 0 ? `
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        ${reflows > 0 ? `<span class="badge badge-warning"><i class="fas fa-sync"></i> ${reflows} Reflows</span>` : ''}
+                        ${warnings > 0 ? `<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> ${warnings} Warnings</span>` : ''}
+                    </div>
+                ` : '<span class="badge badge-success"><i class="fas fa-check"></i> No Issues</span>'}
+            </td>
+            <td>
+                <span class="badge badge-${pageScoreStatus.color}">
+                    ${score}/100
                 </span>
+                <br><small style="color: var(--text-secondary);">${pageScoreStatus.label}</small>
             </td>
             <td>
-                ${reflows > 0 ? `<span class="badge badge-warning">${reflows}</span>` : '<span class="badge badge-success">0</span>'}
-            </td>
-            <td>
-                ${warnings > 0 ? `<span class="badge badge-warning">${warnings}</span>` : '<span class="badge badge-success">0</span>'}
-            </td>
-            <td>
-                <span class="score-badge score-${scoreClass}">${score}</span>
-            </td>
-            <td>
-                <button class="action-btn action-btn-view" data-url="${page.url}">
-                    <i class="fas fa-eye"></i> View Details
+                <button class="action-btn action-btn-view dom-details-btn" data-page-url="${escapeHtml(page.url)}">
+                    <i class="fas fa-eye"></i> Details
                 </button>
             </td>
         `;
         
-        // Wire up view button
-        const viewBtn = tr.querySelector('button.action-btn-view');
-        if (viewBtn) {
-            viewBtn.onclick = () => showDOMDetails(page);
+        // Wire up the details button
+        const detailsBtn = tr.querySelector('.dom-details-btn');
+        if (detailsBtn) {
+            detailsBtn.addEventListener('click', function() {
+                showDOMDetailsPage(page.url);
+            });
         }
         
         tbody.appendChild(tr);
     });
 }
 
-// Show DOM Analysis details
+// Show DOM details for a specific page
+function showDOMDetailsPage(pageUrl) {
+    // Find the page data
+    let page = null;
+    
+    // Try stored DOM analysis pages first
+    if (window.domAnalysisPages && window.domAnalysisPages[pageUrl]) {
+        page = window.domAnalysisPages[pageUrl];
+    }
+    // Try window.crawlData
+    else if (window.crawlData && window.crawlData.pages) {
+        page = window.crawlData.pages.find(p => p.url === pageUrl);
+    }
+    
+    if (!page || !page.dom_analysis) {
+        alert('DOM analysis data not available for this page. Please refresh and try again.');
+        return;
+    }
+    
+    showDOMDetails(page);
+}
+
+// Show DOM Analysis details - Enhanced with explanations and fix guides
 function showDOMDetails(page) {
     const dom = page.dom_analysis;
     if (!dom) return;
@@ -9172,73 +9452,187 @@ function showDOMDetails(page) {
     
     if (!modal || !modalTitle || !modalBody) return;
     
-    modalTitle.textContent = `DOM Analysis: ${page.title || page.url}`;
+    modalTitle.innerHTML = `<i class="fas fa-sitemap"></i> DOM Analysis: ${escapeHtml(page.title || page.url)}`;
+    
+    const nodeCount = dom.total_nodes || 0;
+    const depth = dom.deepest_depth || 0;
+    const score = dom.score || 0;
+    const reflows = dom.reflow_elements || [];
+    const warnings = dom.section_warnings || [];
+    
+    // Determine status
+    const getNodeStatus = (nodes) => {
+        if (nodes <= 800) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (nodes <= 1500) return { status: 'good', label: 'Good', color: 'info' };
+        if (nodes <= 2000) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const getDepthStatus = (depth) => {
+        if (depth <= 10) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (depth <= 15) return { status: 'good', label: 'Good', color: 'info' };
+        if (depth <= 20) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const getScoreStatus = (score) => {
+        if (score >= 80) return { status: 'excellent', label: 'Excellent', color: 'success' };
+        if (score >= 60) return { status: 'good', label: 'Good', color: 'info' };
+        if (score >= 40) return { status: 'warning', label: 'Warning', color: 'warning' };
+        return { status: 'critical', label: 'Critical', color: 'danger' };
+    };
+    
+    const nodeStatus = getNodeStatus(nodeCount);
+    const depthStatus = getDepthStatus(depth);
+    const scoreStatus = getScoreStatus(score);
     
     modalBody.innerHTML = `
         <div class="modal-section">
-            <h3><i class="fas fa-sitemap"></i> DOM Structure Overview</h3>
-            <div class="dom-stats">
-                <div class="stat-item">
-                    <strong>Total DOM Nodes:</strong> ${(dom.total_nodes || 0).toLocaleString()}
+            <h3><i class="fas fa-info-circle"></i> What This Analysis Shows</h3>
+            <p style="color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px;">
+                This page analysis shows the structure and complexity of your HTML elements. A simpler, cleaner DOM structure 
+                leads to faster page loading, better user experience, and improved SEO rankings.
+            </p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <div style="padding: 15px; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">Total DOM Nodes</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-color); margin-bottom: 5px;">
+                        ${nodeCount.toLocaleString()}
+                    </div>
+                    <span class="badge badge-${nodeStatus.color}">${nodeStatus.label}</span>
                 </div>
-                <div class="stat-item">
-                    <strong>Deepest Depth:</strong> ${dom.deepest_depth || 0} levels
+                <div style="padding: 15px; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">Nesting Depth</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-color); margin-bottom: 5px;">
+                        ${depth} levels
+                    </div>
+                    <span class="badge badge-${depthStatus.color}">${depthStatus.label}</span>
                 </div>
-                <div class="stat-item">
-                    <strong>DOM Quality Score:</strong> <span class="score-badge">${dom.score || 0}/100</span>
+                <div style="padding: 15px; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">Quality Score</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-color); margin-bottom: 5px;">
+                        ${score}/100
+                    </div>
+                    <span class="badge badge-${scoreStatus.color}">${scoreStatus.label}</span>
                 </div>
             </div>
         </div>
         
-        ${dom.reflow_elements && dom.reflow_elements.length > 0 ? `
+        ${reflows.length > 0 ? `
             <div class="modal-section">
-                <h3><i class="fas fa-sync"></i> Reflow-Triggering Elements (${dom.reflow_elements.length})</h3>
-                <div class="reflow-list">
-                    ${dom.reflow_elements.slice(0, 20).map(el => `
-                        <div class="reflow-item">
-                            <strong>${el.tag}</strong>
-                            ${el.id ? `<span class="badge">#${el.id}</span>` : ''}
-                            ${el.class ? `<span class="badge">.${el.class.split(' ')[0]}</span>` : ''}
-                            <div class="reflow-location">${el.location || 'N/A'}</div>
-                        </div>
-                    `).join('')}
+                <h3>
+                    <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i> 
+                    Reflow-Triggering Elements (${reflows.length})
+                </h3>
+                <div class="info-box" style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="margin: 0; line-height: 1.8; color: var(--text-color);">
+                        <strong>What are Reflows?</strong><br>
+                        Reflows happen when the browser recalculates the layout of your page. Elements with inline styles 
+                        (like <code>style="width: 100px"</code>) can trigger reflows, causing the page to "jump" or render slowly.
+                    </p>
                 </div>
-            </div>
-        ` : ''}
-        
-        ${dom.section_warnings && dom.section_warnings.length > 0 ? `
-            <div class="modal-section">
-                <h3><i class="fas fa-exclamation-triangle"></i> Section Warnings (${dom.section_warnings.length})</h3>
-                <div class="warning-list">
-                    ${dom.section_warnings.map(warning => `
-                        <div class="warning-item">
-                            <strong>${warning.tag}</strong>
-                            ${warning.id ? `<span class="badge">#${warning.id}</span>` : ''}
-                            <div class="warning-details">
-                                <strong>Node Count:</strong> ${warning.node_count} (max recommended: 100)
+                <div style="margin-bottom: 20px;">
+                    ${reflows.slice(0, 10).map((el, idx) => `
+                        <div style="padding: 12px; margin-bottom: 10px; background: white; border: 1px solid var(--border-color); border-radius: 6px; border-left: 4px solid #ffc107;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <strong style="color: var(--text-color);">&lt;${el.tag || 'element'}&gt;</strong>
+                                ${el.id ? `<span class="badge badge-info">#${escapeHtml(el.id)}</span>` : ''}
+                                ${el.class ? `<span class="badge badge-secondary">.${escapeHtml(el.class.split(' ')[0])}</span>` : ''}
                             </div>
-                            <div class="warning-location">${warning.location || 'N/A'}</div>
+                            ${el.location ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Location: ${escapeHtml(el.location)}</div>` : ''}
+                            ${el.style ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;"><code>${escapeHtml(el.style.substring(0, 100))}${el.style.length > 100 ? '...' : ''}</code></div>` : ''}
                         </div>
                     `).join('')}
+                    ${reflows.length > 10 ? `<p style="color: var(--text-secondary); font-size: 0.9rem;">... and ${reflows.length - 10} more reflow elements</p>` : ''}
+                </div>
+                <div style="padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <h4 style="margin-top: 0; color: var(--primary-color); display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-wrench"></i> How to Fix Reflow Issues
+                    </h4>
+                    <ol style="margin: 15px 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                        <li><strong>Move inline styles to CSS:</strong> Instead of <code>&lt;div style="width: 100px"&gt;</code>, use CSS classes</li>
+                        <li><strong>Use CSS classes:</strong> Create reusable styles in your stylesheet</li>
+                        <li><strong>Avoid setting dimensions inline:</strong> Use CSS media queries for responsive design</li>
+                        <li><strong>Minimize layout changes:</strong> Avoid changing width/height with JavaScript during page load</li>
+                        <li><strong>Use CSS transforms:</strong> For animations, use <code>transform</code> instead of changing position/size</li>
+                    </ol>
+                    <div style="margin-top: 15px; padding: 12px; background: white; border-radius: 4px;">
+                        <strong style="color: var(--primary-color);">Example Fix:</strong><br>
+                        <div style="margin-top: 8px;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 5px;">❌ Bad (causes reflow):</div>
+                            <code style="display: block; padding: 8px; background: #fee; border-radius: 4px; color: #c00;">&lt;div style="width: 100px; height: 50px;"&gt;Content&lt;/div&gt;</code>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 5px;">✓ Good (no reflow):</div>
+                            <code style="display: block; padding: 8px; background: #efe; border-radius: 4px; color: #060;">&lt;div class="my-box"&gt;Content&lt;/div&gt;<br>/* CSS: .my-box { width: 100px; height: 50px; } */</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        ` : '<div class="success-message" style="margin-bottom: 20px;"><i class="fas fa-check-circle"></i><p>No reflow issues found! Your page uses CSS classes properly.</p></div>'}
+        
+        ${warnings.length > 0 ? `
+            <div class="modal-section">
+                <h3>
+                    <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i> 
+                    Complex Sections (${warnings.length})
+                </h3>
+                <div class="info-box" style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="margin: 0; line-height: 1.8; color: var(--text-color);">
+                        <strong>What are Complex Sections?</strong><br>
+                        These sections contain too many HTML elements (more than 100 nodes). Large sections can slow down 
+                        page rendering and make the code harder to maintain.
+                    </p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    ${warnings.map(warning => `
+                        <div style="padding: 12px; margin-bottom: 10px; background: white; border: 1px solid var(--border-color); border-radius: 6px; border-left: 4px solid #ffc107;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <strong style="color: var(--text-color);">&lt;${warning.tag || 'section'}&gt;</strong>
+                                ${warning.id ? `<span class="badge badge-info">#${escapeHtml(warning.id)}</span>` : ''}
+                                ${warning.class ? `<span class="badge badge-secondary">.${escapeHtml(warning.class.split(' ')[0])}</span>` : ''}
+                                <span class="badge badge-warning"><strong>${warning.node_count || 0} nodes</strong></span>
+                            </div>
+                            ${warning.location ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Location: ${escapeHtml(warning.location)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <h4 style="margin-top: 0; color: var(--primary-color); display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-wrench"></i> How to Fix Complex Sections
+                    </h4>
+                    <ol style="margin: 15px 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                        <li><strong>Break into smaller sections:</strong> Split large sections into logical sub-sections</li>
+                        <li><strong>Use lazy loading:</strong> Load content below the fold only when needed</li>
+                        <li><strong>Remove unnecessary wrapper divs:</strong> Eliminate extra nesting layers</li>
+                        <li><strong>Optimize lists/tables:</strong> Use pagination or virtualization for long lists</li>
+                        <li><strong>Review your HTML structure:</strong> Look for redundant or nested containers</li>
+                    </ol>
                 </div>
             </div>
         ` : ''}
         
-        ${dom.issues && dom.issues.length > 0 ? `
+        ${nodeCount > 2000 || depth > 20 || score < 40 ? `
             <div class="modal-section">
-                <h3><i class="fas fa-exclamation-circle"></i> Issues</h3>
-                <ul class="issues-list">
-                    ${dom.issues.map(issue => `<li>${issue}</li>`).join('')}
-                </ul>
+                <h3><i class="fas fa-lightbulb" style="color: var(--warning-color);"></i> General Optimization Recommendations</h3>
+                <div style="padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 2;">
+                        ${nodeCount > 2000 ? '<li><strong>Reduce DOM nodes:</strong> Remove unnecessary wrapper divs and simplify HTML structure</li>' : ''}
+                        ${depth > 20 ? '<li><strong>Flatten nesting:</strong> Reduce the depth of nested elements - aim for maximum 10-15 levels</li>' : ''}
+                        <li><strong>Use semantic HTML:</strong> Replace excessive <code>&lt;div&gt;</code> tags with semantic elements like <code>&lt;header&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;section&gt;</code>, <code>&lt;article&gt;</code></li>
+                        <li><strong>Remove dead code:</strong> Delete unused HTML elements and commented-out code</li>
+                        <li><strong>Optimize third-party widgets:</strong> Lazy load social media embeds, ads, and analytics</li>
+                        <li><strong>Use CSS instead of tables:</strong> For layouts, use CSS Grid or Flexbox instead of nested tables</li>
+                    </ul>
+                </div>
             </div>
         ` : ''}
         
-        ${dom.recommendations && dom.recommendations.length > 0 ? `
-            <div class="modal-section">
-                <h3><i class="fas fa-lightbulb"></i> Recommendations</h3>
-                <ul class="recommendations-list">
-                    ${dom.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                </ul>
+        ${score >= 80 ? `
+            <div class="success-message" style="margin-top: 20px;">
+                <i class="fas fa-check-circle"></i>
+                <p><strong>Excellent!</strong> Your page has a clean, optimized DOM structure. Keep up the good work!</p>
             </div>
         ` : ''}
     `;
