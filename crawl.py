@@ -67,6 +67,14 @@ except ImportError:
     AdvancedSEOAnalyzer = None
     DOMAnalyzer = None
 
+# Import advanced SEO audit orchestrator (optional - new features)
+try:
+    from advanced_seo_audit_orchestrator import AdvancedSEOAuditOrchestrator
+    ADVANCED_SEO_AUDIT_AVAILABLE = True
+except ImportError:
+    ADVANCED_SEO_AUDIT_AVAILABLE = False
+    AdvancedSEOAuditOrchestrator = None
+
 
 class BrokenLinkChecker:
     """
@@ -178,15 +186,26 @@ class ReportGenerator:
     Generate JSON and CSV reports from crawled data.
     """
     
-    def __init__(self, output_dir: str = 'output'):
+    def __init__(self, output_dir: str = 'output', analysis_config: dict = None):
         """
         Initialize the report generator.
         
         Args:
             output_dir: Directory to save reports
+            analysis_config: Optional analysis configuration for advanced features
         """
         self.output_dir = output_dir
+        self.analysis_config = analysis_config or {}
         os.makedirs(output_dir, exist_ok=True)
+        
+        # Initialize advanced SEO audit orchestrator if available
+        self.advanced_audit_orchestrator = None
+        if ADVANCED_SEO_AUDIT_AVAILABLE and AdvancedSEOAuditOrchestrator:
+            try:
+                self.advanced_audit_orchestrator = AdvancedSEOAuditOrchestrator(self.analysis_config)
+            except Exception as e:
+                print(f"Warning: Advanced SEO audit orchestrator initialization failed: {e}")
+                self.advanced_audit_orchestrator = None
     
     def generate_reports(self, items: List[dict], broken_links: Dict[str, dict], skipped_pages: List[dict] = None):
         """
@@ -407,6 +426,23 @@ class ReportGenerator:
             if url in page_powers:
                 page_data['page_power'] = page_powers[url]
             
+            # Run Advanced SEO Audit Orchestrator (new comprehensive analysis)
+            if self.advanced_audit_orchestrator:
+                try:
+                    html_content_for_audit = item.get('html_content', '')
+                    if html_content_for_audit:
+                        # Note: response_headers not available here, pass None
+                        page_data = self.advanced_audit_orchestrator.analyze_page(
+                            page_data, 
+                            html_content_for_audit, 
+                            url,
+                            response_headers=None  # Headers not available at this stage
+                        )
+                except Exception as e:
+                    print(f"Warning: Advanced SEO audit orchestrator failed for {url}: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             report_data['pages'].append(page_data)
         
         # Calculate site-wide SEO score
@@ -458,6 +494,16 @@ class ReportGenerator:
             print(f"Warning: External link analysis failed: {e}")
             import traceback
             traceback.print_exc()
+        
+        # Run site-wide analysis with advanced orchestrator
+        if self.advanced_audit_orchestrator:
+            try:
+                site_analysis = self.advanced_audit_orchestrator.analyze_site(report_data['pages'])
+                report_data['advanced_site_analysis'] = site_analysis
+            except Exception as e:
+                print(f"Warning: Site-wide advanced analysis failed: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Save JSON report
         json_path = os.path.join(self.output_dir, 'report.json')
@@ -1134,7 +1180,8 @@ class CrawlerRunner:
         print("\n" + "="*60)
         print("Generating reports...")
         print("="*60 + "\n")
-        report_generator = ReportGenerator(self.output_dir)
+        # Pass analysis_config to ReportGenerator for advanced features
+        report_generator = ReportGenerator(self.output_dir, analysis_config=self.analysis_config)
         report_generator.generate_reports(self.crawled_items, broken_links, self.skipped_pages)
         
         # Print summary

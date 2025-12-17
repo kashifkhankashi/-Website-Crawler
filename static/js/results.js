@@ -83,6 +83,9 @@ async function loadResults() {
 
 // Display all sections (optimized with async batching to prevent UI blocking)
 function displayAllSections(data) {
+    // Store data globally for access from tab clicks
+    window.crawlData = data;
+    
     // Show loading indicator
     const loadingIndicator = document.getElementById('loadingIndicator');
     
@@ -118,6 +121,54 @@ function displayAllSections(data) {
         () => { try { displayProfessionalAudit(data); } catch (e) { console.error('Error displaying professional audit:', e); } },
         () => { try { displayPagePower(data); } catch (e) { console.error('Error displaying page power:', e); } },
         () => { try { displayAdvancedSEO(data); displaySkippedPages(data); } catch (e) { console.error('Error displaying advanced SEO:', e); } },
+        () => { 
+            try { 
+                if (typeof displayCoreWebVitals === 'function') {
+                    displayCoreWebVitals(data); 
+                } else {
+                    console.warn('displayCoreWebVitals function not available');
+                }
+            } catch (e) { 
+                console.error('Error displaying Core Web Vitals:', e);
+                const container = document.getElementById('coreWebVitalsContainer');
+                if (container) {
+                    container.innerHTML = `<div class="error">Error loading Core Web Vitals: ${e.message}</div>`;
+                }
+            }
+        },
+        () => { 
+            try { 
+                if (typeof displaySecurityAnalysis === 'function') {
+                    displaySecurityAnalysis(data); 
+                } else {
+                    console.warn('displaySecurityAnalysis function not available');
+                }
+            } catch (e) { 
+                console.error('Error displaying security analysis:', e); 
+            }
+        },
+        () => { 
+            try { 
+                if (typeof displayIndexabilityAnalysis === 'function') {
+                    displayIndexabilityAnalysis(data); 
+                } else {
+                    console.warn('displayIndexabilityAnalysis function not available');
+                }
+            } catch (e) { 
+                console.error('Error displaying indexability analysis:', e); 
+            }
+        },
+        () => { 
+            try { 
+                if (typeof displayComprehensiveSEOScores === 'function') {
+                    displayComprehensiveSEOScores(data); 
+                } else {
+                    console.warn('displayComprehensiveSEOScores function not available');
+                }
+            } catch (e) { 
+                console.error('Error displaying comprehensive SEO scores:', e); 
+            }
+        },
         () => { try { displayDOMAnalysis(data); } catch (e) { console.error('Error displaying DOM analysis:', e); } }
     ];
     
@@ -3381,7 +3432,12 @@ function showPageDetails(page) {
             <div class="modal-section">
                 <h3><i class="fas fa-external-link-alt"></i> External Links (${page.external_links.length})</h3>
                 <ul class="modal-links">
-                    ${page.external_links.slice(0, 10).map(url => `<li><a href="${url}" target="_blank">${url}</a></li>`).join('')}
+                    ${page.external_links.slice(0, 10).map(link => {
+                        const url = typeof link === 'string' ? link : (link.url || link.href || '');
+                        const anchorText = typeof link === 'object' ? (link.anchor_text || '') : '';
+                        const displayText = anchorText ? `${anchorText} (${url})` : url;
+                        return `<li><a href="${url}" target="_blank">${displayText}</a></li>`;
+                    }).join('')}
                     ${page.external_links.length > 10 ? `<li><em>... and ${page.external_links.length - 10} more</em></li>` : ''}
                 </ul>
             </div>
@@ -3707,6 +3763,84 @@ function showSection(sectionName) {
     if (sectionName === 'schema-analyzer') {
         loadSchemaAnalysis();
     }
+    
+    // Load advanced SEO features when their tabs are clicked
+    if (sectionName === 'core-web-vitals') {
+        // Force reload the Core Web Vitals data when tab is clicked
+        const cwvContainer = document.getElementById('coreWebVitalsContainer');
+        if (cwvContainer && cwvContainer.innerHTML.includes('Loading')) {
+            // Clear loading state immediately
+            cwvContainer.innerHTML = '';
+        }
+        
+        setTimeout(() => {
+            try {
+                console.log('Loading CWV on tab click, checking for data...');
+                if (typeof window.crawlData !== 'undefined' && window.crawlData && typeof displayCoreWebVitals === 'function') {
+                    console.log('Using window.crawlData for CWV');
+                    displayCoreWebVitals(window.crawlData);
+                } else if (typeof displayCoreWebVitals === 'function') {
+                    // Try to get data from global reportData if available
+                    if (typeof reportData !== 'undefined' && reportData) {
+                        console.log('Using reportData for CWV');
+                        displayCoreWebVitals(reportData);
+                    } else {
+                        console.warn('No data available for CWV');
+                        if (cwvContainer) {
+                            cwvContainer.innerHTML = `
+                                <div class="info-message" style="padding: 40px; text-align: center;">
+                                    <i class="fas fa-info-circle" style="font-size: 48px; color: #6c757d; margin-bottom: 20px;"></i>
+                                    <h3>No Data Available</h3>
+                                    <p>No crawl data is available. Please run a crawl first.</p>
+                                </div>
+                            `;
+                        }
+                    }
+                } else {
+                    console.error('displayCoreWebVitals function not found');
+                    if (cwvContainer) {
+                        cwvContainer.innerHTML = `
+                            <div class="info-message" style="padding: 40px; text-align: center;">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                                <h3>Function Not Found</h3>
+                                <p>displayCoreWebVitals function is not available.</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading Core Web Vitals on tab click:', e);
+                if (cwvContainer) {
+                    cwvContainer.innerHTML = `
+                        <div class="info-message" style="padding: 40px; text-align: center;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                            <h3>Error</h3>
+                            <p>${e.message || 'An error occurred'}</p>
+                        </div>
+                    `;
+                }
+            }
+        }, 50);
+    }
+    if (sectionName === 'security-trust' && typeof window.crawlData !== 'undefined') {
+        try {
+            if (typeof displaySecurityAnalysis === 'function') {
+                displaySecurityAnalysis(window.crawlData);
+            }
+        } catch (e) {
+            console.error('Error loading Security Analysis:', e);
+        }
+    }
+    if (sectionName === 'indexability' && typeof window.crawlData !== 'undefined') {
+        try {
+            if (typeof displayIndexabilityAnalysis === 'function') {
+                displayIndexabilityAnalysis(window.crawlData);
+            }
+        } catch (e) {
+            console.error('Error loading Indexability Analysis:', e);
+        }
+    }
+    
     // Hide all sections
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
@@ -3731,7 +3865,10 @@ function showSection(sectionName) {
             (sectionName === 'external-links' && btnText.includes('external')) ||
             (sectionName === 'broken-links' && btnText.includes('broken')) ||
             (sectionName === 'summary-report' && btnText.includes('summary')) ||
-            (sectionName === 'schema-analyzer' && btnText.includes('schema'))) {
+            (sectionName === 'schema-analyzer' && btnText.includes('schema')) ||
+            (sectionName === 'core-web-vitals' && (btnText.includes('core') || btnText.includes('vitals'))) ||
+            (sectionName === 'security-trust' && btnText.includes('security')) ||
+            (sectionName === 'indexability' && btnText.includes('indexability'))) {
             btn.classList.add('active');
         }
     });
@@ -4500,7 +4637,10 @@ function displayPerformanceAnalysis(data) {
     const allRenderBlocking = [];
     
     data.pages.forEach(page => {
+        // Check for both old and new performance analysis
         const perf = page.performance_analysis || {};
+        const advPerf = page.advanced_performance || {};
+        const renderLoading = page.render_loading_analysis || {};
         const pageUrl = page.url;
         const pageTitle = page.title || pageUrl;
         
@@ -4548,7 +4688,7 @@ function displayPerformanceAnalysis(data) {
             });
         }
         
-        // Render-blocking resources
+        // Render-blocking resources (from old perf or new render_loading_analysis)
         if (perf.render_blocking_resources && perf.render_blocking_resources.length > 0) {
             perf.render_blocking_resources.forEach(resource => {
                 allRenderBlocking.push({
@@ -4556,6 +4696,57 @@ function displayPerformanceAnalysis(data) {
                     page_url: pageUrl,
                     page_title: pageTitle
                 });
+            });
+        }
+        
+        // Also check render_loading_analysis for render-blocking resources
+        if (renderLoading && renderLoading.render_blocking_resources) {
+            const blocking = renderLoading.render_blocking_resources;
+            if (blocking.css && blocking.css.length > 0) {
+                blocking.css.forEach(css => {
+                    allRenderBlocking.push({
+                        ...css,
+                        type: 'CSS',
+                        page_url: pageUrl,
+                        page_title: pageTitle
+                    });
+                });
+            }
+            if (blocking.javascript && blocking.javascript.length > 0) {
+                blocking.javascript.forEach(js => {
+                    allRenderBlocking.push({
+                        ...js,
+                        type: 'JavaScript',
+                        page_url: pageUrl,
+                        page_title: pageTitle
+                    });
+                });
+            }
+        }
+        
+        // Add advanced performance data if available
+        if (advPerf.js_analysis && advPerf.js_analysis.external_files) {
+            advPerf.js_analysis.external_files.forEach(file => {
+                if (file.size_kb > 100) {  // Only large files
+                    allSlowJsCss.push({
+                        ...file,
+                        type: 'JavaScript',
+                        page_url: pageUrl,
+                        page_title: pageTitle
+                    });
+                }
+            });
+        }
+        if (advPerf.css_analysis && advPerf.css_analysis.external_files) {
+            advPerf.css_analysis.external_files.forEach(file => {
+                if (file.size_kb > 100) {  // Only large files
+                    allSlowJsCss.push({
+                        ...file,
+                        type: 'CSS',
+                        page_url: pageUrl,
+                        page_title: pageTitle
+                    });
+                }
             });
         }
     });
@@ -8752,12 +8943,175 @@ function displayTopContent(data) {
     container.innerHTML = html;
 }
 
+// Display comprehensive SEO scores
+function displayComprehensiveSEO(container, data, siteScore) {
+    // Calculate from page scores if site score not provided
+    if (!siteScore) {
+        const pagesWithScores = data.pages.filter(p => p.comprehensive_seo_score);
+        if (pagesWithScores.length === 0) {
+            container.innerHTML = '<div class="info-message"><i class="fas fa-info-circle"></i><p>Comprehensive SEO scores not available. Run a new crawl to generate scores.</p></div>';
+            return;
+        }
+        
+        const scores = pagesWithScores.map(p => p.comprehensive_seo_score);
+        const avgOverall = scores.reduce((sum, s) => sum + (s.overall_score || 0), 0) / scores.length;
+        const totalIssues = scores.reduce((sum, s) => sum + (s.issues?.length || 0), 0);
+        const categoryTotals = { performance: 0, seo: 0, content: 0, technical: 0 };
+        scores.forEach(s => {
+            const cats = s.category_scores || {};
+            categoryTotals.performance += cats.performance || 0;
+            categoryTotals.seo += cats.seo || 0;
+            categoryTotals.content += cats.content || 0;
+            categoryTotals.technical += cats.technical || 0;
+        });
+        
+        siteScore = {
+            overall_score: avgOverall,
+            total_pages: pagesWithScores.length,
+            category_scores: {
+                performance: categoryTotals.performance / scores.length,
+                seo: categoryTotals.seo / scores.length,
+                content: categoryTotals.content / scores.length,
+                technical: categoryTotals.technical / scores.length
+            },
+            issue_counts: { total: totalIssues }
+        };
+    }
+    
+    const overallScore = Math.round(siteScore.overall_score || 0);
+    const categoryScores = siteScore.category_scores || {};
+    
+    let html = `
+        <div class="comprehensive-seo-summary">
+            <div class="seo-score-cards" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div class="seo-score-card main" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; text-align: center;">
+                    <div style="font-size: 48px; font-weight: bold; margin-bottom: 10px;">${overallScore}</div>
+                    <div style="font-size: 18px; opacity: 0.9;">Overall SEO Score</div>
+                    <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">${getScoreGrade(overallScore)}</div>
+                </div>
+                
+                <div class="seo-score-card" style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
+                    <div style="font-size: 32px; font-weight: bold; color: #667eea; margin-bottom: 8px;">${Math.round(categoryScores.performance || 0)}</div>
+                    <div style="font-size: 14px; color: #6c757d;">Performance</div>
+                </div>
+                
+                <div class="seo-score-card" style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
+                    <div style="font-size: 32px; font-weight: bold; color: #f5576c; margin-bottom: 8px;">${Math.round(categoryScores.seo || 0)}</div>
+                    <div style="font-size: 14px; color: #6c757d;">SEO</div>
+                </div>
+                
+                <div class="seo-score-card" style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
+                    <div style="font-size: 32px; font-weight: bold; color: #4facfe; margin-bottom: 8px;">${Math.round(categoryScores.content || 0)}</div>
+                    <div style="font-size: 14px; color: #6c757d;">Content</div>
+                </div>
+                
+                <div class="seo-score-card" style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
+                    <div style="font-size: 32px; font-weight: bold; color: #43e97b; margin-bottom: 8px;">${Math.round(categoryScores.technical || 0)}</div>
+                    <div style="font-size: 14px; color: #6c757d;">Technical</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-container" style="margin-top: 30px;">
+            <h3 style="margin-bottom: 20px;">Page-by-Page SEO Scores</h3>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th>Overall Score</th>
+                        <th>Performance</th>
+                        <th>SEO</th>
+                        <th>Content</th>
+                        <th>Technical</th>
+                        <th>Issues</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.pages.filter(p => p.comprehensive_seo_score).map((page, idx) => {
+                        const score = page.comprehensive_seo_score;
+                        const overall = Math.round(score.overall_score || 0);
+                        const categories = score.category_scores || {};
+                        const issuesCount = score.issues?.length || 0;
+                        
+                        return `
+                            <tr>
+                                <td>
+                                    <a href="${page.url}" target="_blank">${truncateUrl(page.url, 50)}</a><br>
+                                    <small>${escapeHtml(page.title || '').substring(0, 40)}</small>
+                                </td>
+                                <td>
+                                    <span class="badge ${overall >= 90 ? 'badge-success' : overall >= 75 ? 'badge-info' : overall >= 60 ? 'badge-warning' : 'badge-danger'}">${overall}</span>
+                                </td>
+                                <td>${Math.round(categories.performance || 0)}</td>
+                                <td>${Math.round(categories.seo || 0)}</td>
+                                <td>${Math.round(categories.content || 0)}</td>
+                                <td>${Math.round(categories.technical || 0)}</td>
+                                <td>
+                                    ${issuesCount > 0 ? 
+                                        `<span class="badge badge-warning">${issuesCount} issues</span>` : 
+                                        '<span class="badge badge-success">None</span>'
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="showComprehensiveSEODetails(${idx})">
+                                        <i class="fas fa-info-circle"></i> Details
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Store pages with comprehensive scores for details modal
+    if (!window.comprehensiveSEOPages) {
+        window.comprehensiveSEOPages = [];
+    }
+    window.comprehensiveSEOPages = data.pages.filter(p => p.comprehensive_seo_score);
+}
+
+function showComprehensiveSEODetails(index) {
+    if (window.comprehensiveSEOPages && window.comprehensiveSEOPages[index]) {
+        showPageDetails(window.comprehensiveSEOPages[index]);
+    }
+}
+
+function getScoreGrade(score) {
+    if (score >= 90) return 'Excellent';
+    if (score >= 75) return 'Good';
+    if (score >= 60) return 'Fair';
+    if (score >= 40) return 'Poor';
+    return 'Very Poor';
+}
+
 // Display Advanced SEO Audit section
 function displayAdvancedSEO(data) {
     const container = document.getElementById('advancedSeoContainer');
     if (!container || !data.pages) return;
     
-    // Filter pages with advanced SEO audit
+    // Check for comprehensive SEO scores first (new format)
+    const siteAnalysis = data.advanced_site_analysis;
+    const comprehensiveSiteScore = siteAnalysis?.comprehensive_site_score;
+    
+    if (comprehensiveSiteScore) {
+        // Use comprehensive scoring if available
+        displayComprehensiveSEO(container, data, comprehensiveSiteScore);
+        return;
+    }
+    
+    // Check for comprehensive scores in pages
+    const pagesWithComprehensive = data.pages.filter(p => p.comprehensive_seo_score);
+    if (pagesWithComprehensive.length > 0) {
+        displayComprehensiveSEO(container, data, null);
+        return;
+    }
+    
+    // Fallback to old advanced SEO audit format
     const pagesWithAudit = data.pages.filter(p => p.advanced_seo_audit);
     
     if (pagesWithAudit.length === 0) {

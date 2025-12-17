@@ -165,6 +165,15 @@
                 <button class="tab-btn" onclick="showSection('professional-audit')">
                     <i class="fas fa-certificate"></i> Professional Audit
                 </button>
+                <button class="tab-btn" onclick="showSection('core-web-vitals')">
+                    <i class="fas fa-tachometer-alt"></i> Core Web Vitals
+                </button>
+                <button class="tab-btn" onclick="showSection('security-trust')">
+                    <i class="fas fa-shield-alt"></i> Security & Trust
+                </button>
+                <button class="tab-btn" onclick="showSection('indexability')">
+                    <i class="fas fa-search"></i> Indexability
+                </button>
                 <button class="tab-btn" onclick="showSection('dom-analysis')">
                     <i class="fas fa-sitemap"></i> DOM Analysis
                 </button>
@@ -988,6 +997,45 @@
             </section>
 
             <!-- DOM Analysis Section -->
+            <!-- Core Web Vitals Section -->
+            <section id="core-web-vitals-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-tachometer-alt"></i> Core Web Vitals</h2>
+                        <p class="section-description">Google's Core Web Vitals metrics: LCP, CLS, INP, and TTFB</p>
+                    </div>
+                    <div id="coreWebVitalsContainer">
+                        <!-- Content will be loaded by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Security & Trust Section -->
+            <section id="security-trust-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-shield-alt"></i> Security & Trust Signals</h2>
+                        <p class="section-description">HTTPS enforcement, mixed content, security headers, and cookie consent analysis</p>
+                    </div>
+                    <div id="securityAnalysisContainer">
+                        <p class="loading">Loading security analysis...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Indexability Section -->
+            <section id="indexability-section" class="content-section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-search"></i> Indexability & Crawlability</h2>
+                        <p class="section-description">Robots.txt rules, meta robots tags, canonical links, and indexability status</p>
+                    </div>
+                    <div id="indexabilityAnalysisContainer">
+                        <p class="loading">Loading indexability analysis...</p>
+                    </div>
+                </div>
+            </section>
+
             <section id="dom-analysis-section" class="content-section">
                 <div class="card">
                     <div class="section-header">
@@ -1106,6 +1154,7 @@
             }
         };
     </script>
+    <script src="{{ url_for('static', filename='js/advanced_seo_features.js') }}"></script>
     <script src="{{ url_for('static', filename='js/results.js') }}"></script>
 </body>
 </html>
